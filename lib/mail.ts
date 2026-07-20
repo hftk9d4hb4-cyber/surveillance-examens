@@ -1,10 +1,11 @@
 import nodemailer from "nodemailer";
+import type { Transporter } from "nodemailer";
 import type { Exam, User } from "@prisma/client";
 import { baseUrl, smtpConfigured } from "@/lib/env";
 import { generateConvocationIcs, examStartEnd } from "@/lib/calendar";
 import { formatDate } from "@/lib/format";
 
-export function createTransporter() {
+export function createTransporter(): Transporter {
   if (!smtpConfigured()) {
     if (process.env.NODE_ENV === "production") {
       throw new Error("La configuration SMTP est incomplète.");
@@ -34,7 +35,12 @@ export async function sendActivationMail(user: User, token: string) {
     from: process.env.MAIL_FROM || process.env.SMTP_USER,
     to: user.email,
     subject: "Activation de votre compte — Surveillance des examens",
-    text: `Bonjour ${user.name},\n\nVotre compte a été créé. Définissez votre mot de passe avec ce lien valable 7 jours :\n${link}\n\nSi vous n'êtes pas concerné(e), ignorez ce message.`,
+    text: `Bonjour ${user.name},
+
+Votre compte a été créé. Définissez votre mot de passe avec ce lien valable 7 jours :
+${link}
+
+Si vous n'êtes pas concerné(e), ignorez ce message.`,
     html: `<p>Bonjour ${escapeHtml(user.name)},</p><p>Votre compte de gestion des surveillances d'examens a été créé.</p><p><a href="${link}">Définir mon mot de passe</a></p><p>Ce lien est valable 7 jours. Si vous n'êtes pas concerné(e), ignorez ce message.</p>`
   });
 }
@@ -57,7 +63,20 @@ export async function sendConvocationMail(exam: Exam, teacher: User) {
     from: process.env.MAIL_FROM || process.env.SMTP_USER,
     to: teacher.email,
     subject: `Convocation surveillance d'examen — ${exam.title}`,
-    text: `Bonjour ${teacher.name},\n\nVous êtes convoqué(e) pour une surveillance d'examen.\n\nExamen : ${exam.title}\nPromotion : ${exam.promotion}\nDate : ${formatDate(exam.date)}\nHoraire : ${startLabel}–${endLabel}\nLieu : ${exam.location}\n\nUne invitation calendrier est jointe.\n\nBien cordialement,\nLa scolarité`,
+    text: `Bonjour ${teacher.name},
+
+Vous êtes convoqué(e) pour une surveillance d'examen.
+
+Examen : ${exam.title}
+Promotion : ${exam.promotion}
+Date : ${formatDate(exam.date)}
+Horaire : ${startLabel}–${endLabel}
+Lieu : ${exam.location}
+
+Une invitation calendrier est jointe.
+
+Bien cordialement,
+La scolarité`,
     html: `<p>Bonjour ${escapeHtml(teacher.name)},</p><p>Vous êtes convoqué(e) pour une surveillance d'examen.</p><table><tr><td><strong>Examen</strong></td><td>${escapeHtml(exam.title)}</td></tr><tr><td><strong>Promotion</strong></td><td>${escapeHtml(exam.promotion)}</td></tr><tr><td><strong>Date</strong></td><td>${formatDate(exam.date)}</td></tr><tr><td><strong>Horaire</strong></td><td>${startLabel}–${endLabel}</td></tr><tr><td><strong>Lieu</strong></td><td>${escapeHtml(exam.location)}</td></tr></table><p>Une invitation calendrier est jointe.</p><p>Bien cordialement,<br>La scolarité</p>`,
     icalEvent: { filename: "convocation.ics", method: "REQUEST", content: ics },
     attachments: [
