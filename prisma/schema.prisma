@@ -32,34 +32,34 @@ enum ConvocationStatus {
 }
 
 model User {
-  id           String         @id @default(cuid())
-  name         String
-  email        String         @unique
-  passwordHash String
-  role         Role           @default(TEACHER)
-  department   String?
-  speciality   String?
-  isActive     Boolean        @default(true)
+  id             String         @id @default(cuid())
+  name           String
+  email          String         @unique
+  passwordHash   String
+  role           Role           @default(TEACHER)
+  department     String?
+  speciality     String?
+  isActive       Boolean        @default(true)
   availabilities Availability[]
-  assignments  Assignment[]
-  convocations Convocation[]
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  assignments    Assignment[]
+  convocations   Convocation[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 }
 
 model Exam {
-  id                 String       @id @default(cuid())
-  title              String
-  date               DateTime
-  halfDay            HalfDay
-  promotion          String
-  location           String
+  id                  String       @id @default(cuid())
+  title               String
+  date                DateTime
+  halfDay             HalfDay
+  promotion           String
+  location            String
   requiredSupervisors Int
-  notes              String?
-  assignments        Assignment[]
-  convocations       Convocation[]
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @updatedAt
+  notes               String?
+  assignments         Assignment[]
+  convocations        Convocation[]
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
 }
 
 model Availability {
@@ -77,34 +77,33 @@ model Availability {
 }
 
 model Assignment {
-  id        String   @id @default(cuid())
-  examId    String
-  exam      Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  score     Float
-  locked    Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id          String       @id @default(cuid())
+  examId      String
+  exam        Exam         @relation(fields: [examId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  score       Float
+  locked      Boolean      @default(false)
+  createdAt   DateTime     @default(now())
   convocation Convocation?
 
   @@unique([examId, userId])
 }
 
-
 model Convocation {
-  id             String             @id @default(cuid())
-  assignmentId   String             @unique
-  assignment     Assignment         @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
-  examId         String
-  exam           Exam               @relation(fields: [examId], references: [id], onDelete: Cascade)
-  userId         String
-  user           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  status         ConvocationStatus  @default(NOT_SENT)
-  sentAt         DateTime?
-  lastError      String?
-  messageId      String?
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
+  id           String            @id @default(cuid())
+  assignmentId String            @unique
+  assignment   Assignment        @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  examId       String
+  exam         Exam              @relation(fields: [examId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status       ConvocationStatus @default(NOT_SENT)
+  sentAt       DateTime?
+  lastError    String?
+  messageId    String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
 
   @@index([examId])
   @@index([userId])
