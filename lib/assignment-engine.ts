@@ -111,6 +111,8 @@ export function planAssignments(input: {
       })
       .map((teacher) => {
         const status = input.availabilityBySlot.get(`${teacher.id}|${exam.date}|${exam.halfDay}`);
+        const availabilityStatus: PlannedAssignment["scoreDetails"]["availability"] =
+          status ?? "NO_RESPONSE";
         const availability = availabilityPoints(status);
         const load = loads.get(teacher.id) ?? 0;
         const loadPenalty = load * 18;
@@ -123,7 +125,7 @@ export function planAssignments(input: {
           teacher,
           score,
           details: {
-            availability: status ?? "NO_RESPONSE",
+            availability: availabilityStatus,
             availabilityPoints: availability,
             loadPenalty,
             quotaPenalty,
