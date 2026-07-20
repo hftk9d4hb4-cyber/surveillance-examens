@@ -1,44 +1,32 @@
-import { PrismaClient, Role } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
 async function main() {
-  const adminHash = await bcrypt.hash("admin123", 10);
-  const teacherHash = await bcrypt.hash("enseignant123", 10);
+  const email = (process.env.ADMIN_EMAIL || process.env.SMTP_USER || "admin@example.fr").toLowerCase();
+  const password = process.env.ADMIN_PASSWORD || "Changer-Ce-Mot-De-Passe-2026!";
+  const passwordHash = await bcrypt.hash(password, 12);
 
   await prisma.user.upsert({
-    where: { email: "admin@faculte.fr" },
+    where: { email },
     update: {},
     create: {
       name: "Administrateur",
-      email: "admin@faculte.fr",
-      passwordHash: adminHash,
-      role: Role.ADMIN
+      email,
+      passwordHash,
+      role: "ADMIN",
+      isActive: true,
+      mustChangePassword: false
     }
   });
 
-  await prisma.user.upsert({
-    where: { email: "scolarite@faculte.fr" },
-    update: {},
-    create: {
-      name: "Scolarité",
-      email: "scolarite@faculte.fr",
-      passwordHash: adminHash,
-      role: Role.MANAGER
-    }
-  });
-
-  await prisma.user.upsert({
-    where: { email: "enseignant1@faculte.fr" },
-    update: {},
-    create: {
-      name: "Enseignant Démo",
-      email: "enseignant1@faculte.fr",
-      passwordHash: teacherHash,
-      role: Role.TEACHER
-    }
-  });
+  console.log(`Administrateur disponible : ${email}`);
 }
 
-main().finally(() => prisma.$disconnect());
+main()
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  })
+  .finally(() => prisma.$disconnect());

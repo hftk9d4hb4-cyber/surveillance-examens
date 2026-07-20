@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
 }
 
 enum Role {
@@ -25,48 +26,104 @@ enum AvailabilityStatus {
   STRONG_AVAILABLE
 }
 
+enum ExamStatus {
+  DRAFT
+  PUBLISHED
+  CANCELLED
+}
+
+enum AssignmentSource {
+  AUTO
+  MANUAL
+}
+
 enum ConvocationStatus {
-  NOT_SENT
+  PENDING
   SENT
   ERROR
 }
 
+enum ImportKind {
+  TEACHERS
+  EXAMS
+}
+
+enum ImportStatus {
+  SUCCESS
+  PARTIAL
+  ERROR
+}
+
 model User {
-  id             String         @id @default(cuid())
-  name           String
-  email          String         @unique
-  passwordHash   String
-  role           Role           @default(TEACHER)
-  department     String?
-  speciality     String?
-  isActive       Boolean        @default(true)
-  availabilities Availability[]
-  assignments    Assignment[]
-  convocations   Convocation[]
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  id               String            @id @default(cuid())
+  firstName        String?
+  lastName         String?
+  name             String
+  email            String            @unique
+  passwordHash     String?
+  role             Role              @default(TEACHER)
+  department       String?
+  speciality       String?
+  quotaAnnual      Int?
+  isActive         Boolean           @default(true)
+  mustChangePassword Boolean         @default(true)
+  activationSentAt DateTime?
+  lastLoginAt      DateTime?
+  availabilities   Availability[]
+  assignments      Assignment[]
+  convocations     Convocation[]
+  activationTokens ActivationToken[]
+  importLogs       ImportLog[]        @relation("ImportCreator")
+  auditLogs        AuditLog[]         @relation("AuditActor")
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@index([role, isActive])
+  @@index([lastName, firstName])
+}
+
+model ActivationToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId, expiresAt])
 }
 
 model Exam {
-  id                  String       @id @default(cuid())
+  id                  String        @id @default(cuid())
+  externalId          String?       @unique
   title               String
-  date                DateTime
+  date                DateTime      @db.Date
   halfDay             HalfDay
+  startTime           String
+  endTime             String
+  timezone            String        @default("Europe/Paris")
+  academicYear        String
   promotion           String
   location            String
   requiredSupervisors Int
+  status              ExamStatus    @default(PUBLISHED)
   notes               String?
   assignments         Assignment[]
   convocations        Convocation[]
-  createdAt           DateTime     @default(now())
-  updatedAt           DateTime     @updatedAt
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  @@unique([date, halfDay, title, location], name: "examNaturalKey")
+  @@index([academicYear, date, halfDay])
+  @@index([status, date])
 }
 
 model Availability {
   id        String             @id @default(cuid())
   userId    String
   user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  date      DateTime
+  date      DateTime           @db.Date
   halfDay   HalfDay
   status    AvailabilityStatus
   comment   String?
@@ -74,37 +131,74 @@ model Availability {
   updatedAt DateTime           @updatedAt
 
   @@unique([userId, date, halfDay])
+  @@index([date, halfDay, status])
 }
 
 model Assignment {
-  id          String       @id @default(cuid())
-  examId      String
-  exam        Exam         @relation(fields: [examId], references: [id], onDelete: Cascade)
-  userId      String
-  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  score       Float
-  locked      Boolean      @default(false)
-  createdAt   DateTime     @default(now())
-  convocation Convocation?
+  id           String           @id @default(cuid())
+  examId       String
+  exam         Exam             @relation(fields: [examId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  score        Float
+  scoreDetails Json?
+  source       AssignmentSource @default(AUTO)
+  locked       Boolean          @default(false)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  convocation  Convocation?
 
   @@unique([examId, userId])
+  @@index([userId, createdAt])
 }
 
 model Convocation {
-  id           String            @id @default(cuid())
-  assignmentId String            @unique
-  assignment   Assignment        @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  id           String             @id @default(cuid())
+  assignmentId String             @unique
+  assignment   Assignment         @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
   examId       String
-  exam         Exam              @relation(fields: [examId], references: [id], onDelete: Cascade)
+  exam         Exam               @relation(fields: [examId], references: [id], onDelete: Cascade)
   userId       String
-  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  status       ConvocationStatus @default(NOT_SENT)
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status       ConvocationStatus  @default(PENDING)
   sentAt       DateTime?
   lastError    String?
   messageId    String?
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
 
-  @@index([examId])
-  @@index([userId])
+  @@index([examId, status])
+  @@index([userId, status])
+}
+
+model ImportLog {
+  id          String       @id @default(cuid())
+  kind        ImportKind
+  status      ImportStatus
+  fileName    String
+  totalRows   Int
+  createdRows Int          @default(0)
+  updatedRows Int          @default(0)
+  skippedRows Int          @default(0)
+  errorRows   Int          @default(0)
+  errors      Json?
+  createdById String?
+  createdBy   User?        @relation("ImportCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime     @default(now())
+
+  @@index([kind, createdAt])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  actor     User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  action    String
+  entity    String
+  entityId  String?
+  details   Json?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([createdAt])
 }

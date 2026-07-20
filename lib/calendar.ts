@@ -1,33 +1,47 @@
 import type { Exam, User } from "@prisma/client";
+import { fromZonedTime } from "date-fns-tz";
+import { dateKey } from "@/lib/format";
 
-export function examStartEnd(exam: Exam) {
-  const start = new Date(exam.date);
-  start.setHours(exam.halfDay === "AM" ? 8 : 13, 30, 0, 0);
-  const end = new Date(start);
-  end.setHours(exam.halfDay === "AM" ? 12 : 17, 30, 0, 0);
-  return { start, end };
+function escapeIcs(value: string) {
+  return value
+    .replace(/\\/g, "\\\\")
+    .replace(/;/g, "\\;")
+    .replace(/,/g, "\\,")
+    .replace(/\r?\n/g, "\\n");
 }
 
-const formatIcsDate = (date: Date) =>
-  date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+function icsUtc(date: Date) {
+  return date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+}
+
+export function examStartEnd(exam: Pick<Exam, "date" | "startTime" | "endTime" | "timezone">) {
+  const day = dateKey(exam.date);
+  return {
+    start: fromZonedTime(`${day}T${exam.startTime}:00`, exam.timezone),
+    end: fromZonedTime(`${day}T${exam.endTime}:00`, exam.timezone)
+  };
+}
 
 export function generateConvocationIcs(exam: Exam, teacher: User) {
   const { start, end } = examStartEnd(exam);
   return [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//Faculte Nice//Surveillance Examens//FR",
+    "PRODID:-//Faculte de Medecine de Nice//Surveillance Examens//FR",
+    "CALSCALE:GREGORIAN",
     "METHOD:REQUEST",
     "BEGIN:VEVENT",
     `UID:${exam.id}-${teacher.id}@examsantenice.fr`,
-    `DTSTAMP:${formatIcsDate(new Date())}`,
-    `DTSTART:${formatIcsDate(start)}`,
-    `DTEND:${formatIcsDate(end)}`,
-    `SUMMARY:Surveillance d'examen - ${exam.title}`,
-    `LOCATION:${exam.location}`,
-    `DESCRIPTION:Promotion ${exam.promotion}`,
-    `ATTENDEE;CN=${teacher.name}:MAILTO:${teacher.email}`,
+    `DTSTAMP:${icsUtc(new Date())}`,
+    `DTSTART:${icsUtc(start)}`,
+    `DTEND:${icsUtc(end)}`,
+    `SUMMARY:${escapeIcs(`Surveillance — ${exam.title}`)}`,
+    `LOCATION:${escapeIcs(exam.location)}`,
+    `DESCRIPTION:${escapeIcs(`Promotion ${exam.promotion}${exam.notes ? `\n${exam.notes}` : ""}`)}`,
+    `ATTENDEE;CN=${escapeIcs(teacher.name)};ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:${teacher.email}`,
+    "STATUS:CONFIRMED",
     "END:VEVENT",
-    "END:VCALENDAR"
+    "END:VCALENDAR",
+    ""
   ].join("\r\n");
 }
