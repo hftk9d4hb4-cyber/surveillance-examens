@@ -44,7 +44,13 @@ export async function removeAssignment(formData: FormData) {
     redirect(`/assignments?year=${encodeURIComponent(assignment.exam.academicYear)}&error=sent`);
   }
   await prisma.assignment.delete({ where: { id } });
-  await writeAudit({ actorId: actor.id, action: "ASSIGNMENT_REMOVED", entity: "Assignment", entityId: id, details: { convocationWasSent: assignment.convocation?.status === "SENT" } });
+  await writeAudit({
+  actorId: actor.id,
+  action: "ASSIGNMENT_REMOVED",
+  entity: "Assignment",
+  entityId: id,
+  details: { convocationWasSent: false },
+});
   revalidatePath("/assignments");
   redirect(`/assignments?year=${encodeURIComponent(assignment.exam.academicYear)}`);
 }
