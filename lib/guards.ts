@@ -1,13 +1,19 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
-import type { Role } from "@prisma/client";
+import type { Role, User } from "@prisma/client";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export async function requireSession() {
   const session = await getServerSession(authOptions);
-  if (!session?.user) redirect("/login");
+  if (!session?.user?.id) redirect("/login");
   return session;
+}
+
+export async function getActiveApiUser(): Promise<User | null> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) return null;
+  return prisma.user.findFirst({ where: { id: session.user.id, isActive: true } });
 }
 
 export async function requireUser() {

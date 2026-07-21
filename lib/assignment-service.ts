@@ -4,7 +4,18 @@ import { dateKey } from "@/lib/format";
 import { planAssignments } from "@/lib/assignment-engine";
 import { writeAudit } from "@/lib/audit";
 
+export class AssignmentGenerationBlockedError extends Error {
+  constructor(public readonly sentConvocations: number) {
+    super("Des convocations ont déjà été envoyées pour cette année universitaire.");
+    this.name = "AssignmentGenerationBlockedError";
+  }
+}
+
 export async function generateAssignments(academicYear: string, actorId: string) {
+  const sentConvocations = await prisma.convocation.count({
+    where: { status: "SENT", exam: { academicYear } }
+  });
+  if (sentConvocations > 0) throw new AssignmentGenerationBlockedError(sentConvocations);
   const [teachers, exams, availabilities, allAssignments] = await Promise.all([
     prisma.user.findMany({
       where: { role: "TEACHER", isActive: true },

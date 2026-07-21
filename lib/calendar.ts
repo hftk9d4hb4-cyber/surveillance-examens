@@ -10,8 +10,30 @@ function escapeIcs(value: string) {
     .replace(/\r?\n/g, "\\n");
 }
 
+function escapeParameter(value: string) {
+  return value.replace(/([\\",;:])/g, "\\$1").replace(/\r?\n/g, " ");
+}
+
 function icsUtc(date: Date) {
   return date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+}
+
+export function calendarSequence(updatedAt: Date) {
+  const seconds = Math.floor(updatedAt.getTime() / 1000);
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : 0;
+}
+
+function foldIcsLine(line: string) {
+  const chunks: string[] = [];
+  let remaining = line;
+  while (Buffer.byteLength(remaining, "utf8") > 73) {
+    let cut = Math.min(73, remaining.length);
+    while (cut > 1 && Buffer.byteLength(remaining.slice(0, cut), "utf8") > 73) cut -= 1;
+    chunks.push(remaining.slice(0, cut));
+    remaining = remaining.slice(cut);
+  }
+  chunks.push(remaining);
+  return chunks.join("\r\n ");
 }
 
 export function examStartEnd(exam: Pick<Exam, "date" | "startTime" | "endTime" | "timezone">) {
@@ -31,17 +53,19 @@ export function generateConvocationIcs(exam: Exam, teacher: User) {
     "CALSCALE:GREGORIAN",
     "METHOD:REQUEST",
     "BEGIN:VEVENT",
-    `UID:${exam.id}-${teacher.id}@examsantenice.fr`,
+    `UID:${exam.id}-${teacher.id}@surveillance-examens`,
     `DTSTAMP:${icsUtc(new Date())}`,
     `DTSTART:${icsUtc(start)}`,
     `DTEND:${icsUtc(end)}`,
     `SUMMARY:${escapeIcs(`Surveillance — ${exam.title}`)}`,
     `LOCATION:${escapeIcs(exam.location)}`,
     `DESCRIPTION:${escapeIcs(`Promotion ${exam.promotion}${exam.notes ? `\n${exam.notes}` : ""}`)}`,
-    `ATTENDEE;CN=${escapeIcs(teacher.name)};ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:${teacher.email}`,
+    `ATTENDEE;CN="${escapeParameter(teacher.name)}";ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:${teacher.email}`,
     "STATUS:CONFIRMED",
+    "TRANSP:OPAQUE",
+    `SEQUENCE:${calendarSequence(exam.updatedAt)}`,
     "END:VEVENT",
     "END:VCALENDAR",
     ""
-  ].join("\r\n");
+  ].map(foldIcsLine).join("\r\n");
 }

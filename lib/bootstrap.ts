@@ -82,7 +82,7 @@ export async function ensureBootstrapAdmin(): Promise<BootstrapResult> {
     configured: true,
     created: true,
     activationSent: true,
-    message: `Un lien d'activation a été envoyé à ${email}.`
+    message: "Le lien d’activation initial a été envoyé."
   };
 }
 
@@ -95,5 +95,5 @@ export async function resendBootstrapActivation() {
   const { token } = await createActivationToken(users[0].id);
   await sendActivationMail(users[0], token);
   await prisma.user.update({ where: { id: users[0].id }, data: { activationSentAt: new Date() } });
-  return { sent: true, message: `Lien renvoyé à ${users[0].email}.` };
+  return { sent: true, message: "Le lien d’activation a été renvoyé." };
 }
