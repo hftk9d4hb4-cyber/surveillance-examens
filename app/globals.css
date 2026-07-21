@@ -172,3 +172,18 @@ tbody tr:hover { background: #fbfdff; }
   .field, .field.third { grid-column: 1 / -1; }
   .card { padding: 16px; }
 }
+
+.nav-button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+
+.nav-button:hover,
+.nav-button:focus-visible {
+  text-decoration: underline;
+}

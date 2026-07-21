@@ -26,7 +26,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         <p className="muted">Faculté de médecine — gestion des disponibilités, affectations et convocations.</p>
         {params.activated === "1" && <Notice type="success">Votre mot de passe a été défini. Vous pouvez vous connecter.</Notice>}
         {bootstrap.message && <Notice type={bootstrap.configured ? "info" : "warning"}>{bootstrap.message}</Notice>}
-        {!bootstrap.configured && <p><a href="/setup">Ouvrir le diagnostic d'installation</a></p>}
+        {!bootstrap.configured && <p className="muted">La configuration initiale doit être vérifiée par l’administrateur technique.</p>}
         <LoginForm />
       </section>
     </main>
