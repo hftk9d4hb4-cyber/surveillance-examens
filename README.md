@@ -1,97 +1,99 @@
-# Surveillance des examens — V1 Neon
+# Surveillance des examens — V1.1.0-rc.2
 
-Application Next.js destinée à la gestion des disponibilités, des affectations équitables et des convocations de surveillance d'examens.
+Application métier de la Faculté de médecine destinée à organiser les surveillances d’examens : enseignants, examens, disponibilités, affectations, convocations et exports.
 
-## Fonctionnalités
+## Périmètre de la Release Candidate
 
-- base PostgreSQL Neon persistante ;
-- authentification sécurisée avec rôles Enseignant, Gestionnaire et Administrateur ;
-- création automatique du premier administrateur et activation par e-mail ;
-- import XLSX/CSV des enseignants et du calendrier des examens ;
+- authentification par adresse électronique et mot de passe ;
+- rôles **Enseignant**, **Gestionnaire** et **Administrateur** ;
+- import XLSX/CSV des enseignants et des examens ;
 - déclaration des disponibilités par demi-journée ;
-- affectation automatique avec contraintes d'indisponibilité, quota, charge et une surveillance maximum par jour ;
-- corrections manuelles et verrouillage ;
-- convocations Gmail par lots avec invitation calendrier `.ics` ;
-- export Excel des affectations et des charges ;
-- journal des imports et audit des opérations sensibles.
+- moteur d’affectation déterministe avec quotas, indisponibilités et limite d’une surveillance par jour ;
+- corrections manuelles et verrouillage des affectations ;
+- convocations par e-mail avec invitation calendrier `.ics` versionnée ;
+- export Excel du planning et de la charge ;
+- journal des imports et journal d’audit.
 
-## Installation sur le dépôt GitHub existant
+## Rôles
 
-1. Décompresser l'archive.
-2. Ouvrir le dossier `surveillance-examens-neon-v1-final`.
-3. Sélectionner **tout son contenu**, puis le déposer à la racine du dépôt GitHub `surveillance-examens`.
-4. Accepter le remplacement des fichiers existants et valider le commit sur `main`.
-5. Ne jamais importer `.env`, `.env.local`, `node_modules` ou `.next`.
+| Fonction | Enseignant | Gestionnaire | Administrateur |
+|---|:---:|:---:|:---:|
+| Renseigner ses disponibilités | Oui | Oui | Oui |
+| Consulter ses surveillances | Oui | Oui | Oui |
+| Gérer les examens | Non | Oui | Oui |
+| Calculer et corriger les affectations | Non | Oui | Oui |
+| Envoyer les convocations | Non | Oui | Oui |
+| Importer les examens | Non | Oui | Oui |
+| Importer et activer les enseignants | Non | Non | Oui |
+| Gérer les rôles | Non | Non | Oui |
 
-La structure correcte est :
+## Déploiement
 
-```text
-surveillance-examens/
-  app/
-  components/
-  lib/
-  prisma/
-  public/
-  tests/
-  package.json
-  vercel.json
-```
+Le dépôt est conçu pour GitHub, Vercel et PostgreSQL/Neon. Vercel exécute :
 
-Si GitHub refuse de remplacer `app/api/auth/[...nextauth]/route.ts`, ce n'est pas bloquant lorsque l'ancien fichier contient déjà les quatre lignes NextAuth correctes.
-
-## Premier démarrage
-
-Le déploiement Vercel exécute automatiquement :
-
-```text
+```bash
 prisma generate
 prisma migrate deploy
 next build
 ```
 
-Au premier affichage de `/login`, l'application crée le premier administrateur :
+Variables requises :
 
-- adresse utilisée : `ADMIN_EMAIL`, ou à défaut `SMTP_USER` ;
-- si `ADMIN_PASSWORD` n'est pas défini, un lien d'activation est envoyé par Gmail.
+```text
+DATABASE_URL
+DATABASE_URL_UNPOOLED
+NEXTAUTH_SECRET
+NEXTAUTH_URL
+ADMIN_EMAIL
+SETUP_TOKEN
+SMTP_HOST
+SMTP_PORT
+SMTP_USER
+SMTP_PASS
+MAIL_FROM
+```
 
-Le diagnostic est disponible sur `/setup`. L'état technique est disponible sur `/api/health`.
+`ADMIN_PASSWORD` est facultatif. Sans mot de passe initial conforme, le premier administrateur reçoit un lien d’activation.
 
-## Variables Vercel requises
+Le diagnostic d’installation est protégé et accessible uniquement par :
 
-### Neon
+```text
+/setup?token=<SETUP_TOKEN>
+```
 
-- `DATABASE_URL` ou `POSTGRES_PRISMA_URL`
-- `DATABASE_URL_UNPOOLED` ou `POSTGRES_URL_NON_POOLING`
+L’état minimal de l’application est disponible sur `/api/health`.
 
-### NextAuth
+## Parcours opérationnel
 
-- `NEXTAUTH_SECRET`
-- `NEXTAUTH_URL=https://surveillance-examens.vercel.app`
+1. L’administrateur importe les enseignants.
+2. Il envoie les liens d’activation.
+3. Un gestionnaire ou un administrateur importe les examens.
+4. Les enseignants renseignent leurs disponibilités.
+5. Le gestionnaire lance le calcul des affectations.
+6. Il corrige et verrouille les exceptions.
+7. Il envoie les convocations par lots.
+8. Il exporte le planning Excel.
 
-### Gmail
+Une fois des convocations envoyées pour une année, le recalcul global et la modification des affectations notifiées sont bloqués afin d’éviter de rendre les courriers déjà reçus incohérents. Les corrections restent possibles de manière ciblée avant information des personnes concernées.
 
-- `SMTP_HOST=smtp.gmail.com`
-- `SMTP_PORT=465`
-- `SMTP_USER`
-- `SMTP_PASS`
-- `MAIL_FROM`
+## Contrôles locaux
 
-### Facultatives
+```bash
+npm ci
+npx prisma generate
+npm run check
+npm run build
+```
 
-- `ADMIN_EMAIL` : adresse du premier administrateur ;
-- `ADMIN_PASSWORD` : mot de passe initial conforme à la politique de sécurité. Sans cette variable, l'activation se fait par e-mail.
+`npm run check` exécute le lint, la vérification TypeScript et les tests automatisés.
 
-## Utilisation
+## Documentation
 
-1. Se connecter comme administrateur.
-2. Ouvrir **Imports**.
-3. Télécharger et compléter les deux modèles Excel.
-4. Importer les enseignants.
-5. Envoyer les liens d'activation par lots de 20.
-6. Importer le calendrier des examens.
-7. Les enseignants renseignent leurs disponibilités.
-8. Ouvrir **Affectations** et lancer le calcul.
-9. Corriger ou verrouiller manuellement si nécessaire.
-10. Ouvrir **Convocations** et envoyer les convocations par lots de 25.
-
-Voir également `docs/FORMAT_IMPORTS.md`, `docs/DEPLOIEMENT.md` et `docs/CONTROLE_FINAL.md`. Après l’import, Vercel réalise la validation finale sur la base Neon réellement connectée.
+- `docs/GUIDE_UTILISATEUR.md`
+- `docs/GUIDE_ADMINISTRATEUR.md`
+- `docs/FORMAT_IMPORTS.md`
+- `docs/DEPLOIEMENT.md`
+- `docs/RECETTE_V1_1.md`
+- `docs/SECURITE.md`
+- `docs/CONTROLE_FINAL.md`
+- `docs/CHANGELOG.md`
