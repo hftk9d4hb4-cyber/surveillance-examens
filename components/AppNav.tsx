@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { hasStaffRole } from "@/lib/guards";
+import { SignOutButton } from "@/components/SignOutButton";
 
 export async function AppNav() {
   const session = await getServerSession(authOptions);
@@ -21,8 +22,8 @@ export async function AppNav() {
           {hasStaffRole(role) && <Link href="/assignments">Affectations</Link>}
           {hasStaffRole(role) && <Link href="/convocations">Convocations</Link>}
           {role === "ADMIN" && <Link href="/admin">Administration</Link>}
-          {role === "ADMIN" && <Link href="/admin/imports">Imports</Link>}
-          <Link href="/api/auth/signout">Déconnexion</Link>
+          {hasStaffRole(role) && <Link href="/admin/imports">Imports</Link>}
+          <SignOutButton />
         </nav>
         <span className="user-chip">{session.user.name} · {role === "ADMIN" ? "Administrateur" : role === "MANAGER" ? "Gestionnaire" : "Enseignant"}</span>
       </div>

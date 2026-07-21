@@ -2,26 +2,114 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import type { AvailabilityStatus, HalfDay } from "@prisma/client";
+import type {
+  AvailabilityStatus,
+  HalfDay,
+  Prisma,
+} from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/guards";
+import { parseIsoDate } from "@/lib/validation";
 
-const validStatuses = new Set(["UNAVAILABLE", "WEAK_AVAILABLE", "AVAILABLE", "STRONG_AVAILABLE"]);
+const validStatuses = new Set([
+  "UNAVAILABLE",
+  "WEAK_AVAILABLE",
+  "AVAILABLE",
+  "STRONG_AVAILABLE",
+]);
 
 export async function saveAvailabilities(formData: FormData) {
   const { user } = await requireUser();
-  const operations = [];
+
+  const requested: {
+    date: Date;
+    halfDay: HalfDay;
+    status: string;
+  }[] = [];
+
   for (const [key, rawValue] of formData.entries()) {
     if (!key.startsWith("availability__")) continue;
+
     const [, dateText, halfDayText] = key.split("__");
-    if (!dateText || !["AM", "PM"].includes(halfDayText)) continue;
-    const status = String(rawValue);
-    const date = new Date(`${dateText}T00:00:00.000Z`);
-    const where = { userId_date_halfDay: { userId: user.id, date, halfDay: halfDayText as HalfDay } };
-    if (!status) operations.push(prisma.availability.deleteMany({ where: where.userId_date_halfDay }));
-    else if (validStatuses.has(status)) operations.push(prisma.availability.upsert({ where, update: { status: status as AvailabilityStatus }, create: { userId: user.id, date, halfDay: halfDayText as HalfDay, status: status as AvailabilityStatus } }));
+    const date = dateText ? parseIsoDate(dateText) : null;
+
+    if (!date || !["AM", "PM"].includes(halfDayText)) continue;
+
+    requested.push({
+      date,
+      halfDay: halfDayText as HalfDay,
+      status: String(rawValue),
+    });
   }
-  if (operations.length) await prisma.$transaction(operations);
+
+  const validSlots = await prisma.exam.findMany({
+    where: {
+      status: "PUBLISHED",
+      OR: requested.map((item) => ({
+        date: item.date,
+        halfDay: item.halfDay,
+      })),
+    },
+    select: {
+      date: true,
+      halfDay: true,
+    },
+  });
+
+  const slotSet = new Set(
+    validSlots.map(
+      (item) =>
+        `${item.date.toISOString().slice(0, 10)}|${item.halfDay}`,
+    ),
+  );
+
+  const operations: Prisma.PrismaPromise<unknown>[] = [];
+
+  for (const item of requested) {
+    const slotKey =
+      `${item.date.toISOString().slice(0, 10)}|${item.halfDay}`;
+
+    if (!slotSet.has(slotKey)) continue;
+
+    const where = {
+      userId_date_halfDay: {
+        userId: user.id,
+        date: item.date,
+        halfDay: item.halfDay,
+      },
+    };
+
+    if (!item.status) {
+      operations.push(
+        prisma.availability.deleteMany({
+          where: where.userId_date_halfDay,
+        }),
+      );
+      continue;
+    }
+
+    if (!validStatuses.has(item.status)) continue;
+
+    operations.push(
+      prisma.availability.upsert({
+        where,
+        update: {
+          status: item.status as AvailabilityStatus,
+        },
+        create: {
+          userId: user.id,
+          date: item.date,
+          halfDay: item.halfDay,
+          status: item.status as AvailabilityStatus,
+        },
+      }),
+    );
+  }
+
+  if (operations.length > 0) {
+    await prisma.$transaction(operations);
+  }
+
   revalidatePath("/availability");
   redirect("/availability?saved=1");
 }

@@ -1,10 +1,20 @@
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/guards";
+import { todayInTimeZone } from "@/lib/time";
 import { dateKey, formatDate, halfDayLabel } from "@/lib/format";
 import { saveAvailabilities } from "./actions";
 import { Notice } from "@/components/Notice";
 
 export const dynamic = "force-dynamic";
+
+type AvailabilityExam = {
+  id: string;
+  title: string;
+  promotion: string;
+  location: string;
+  date: Date;
+  halfDay: "AM" | "PM";
+};
 
 const labels: Record<string, string> = {
   UNAVAILABLE: "Indisponible",
@@ -16,15 +26,16 @@ const labels: Record<string, string> = {
 export default async function AvailabilityPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const { user } = await requireUser();
   const params = await searchParams;
-  const today = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00.000Z");
-  const [exams, availabilities] = await Promise.all([
+  const today = todayInTimeZone();
+  const [examRows, availabilities] = await Promise.all([
     prisma.exam.findMany({ where: { date: { gte: today }, status: "PUBLISHED" }, orderBy: [{ date: "asc" }, { halfDay: "asc" }, { title: "asc" }] }),
     prisma.availability.findMany({ where: { userId: user.id, date: { gte: today } } })
   ]);
-  const slotMap = new Map<string, { date: Date; halfDay: "AM" | "PM"; exams: typeof exams }>();
+  const exams = examRows as AvailabilityExam[];
+  const slotMap = new Map<string, { date: Date; halfDay: "AM" | "PM"; exams: AvailabilityExam[] }>();
   for (const exam of exams) {
     const key = `${dateKey(exam.date)}|${exam.halfDay}`;
-    const current = slotMap.get(key) ?? { date: exam.date, halfDay: exam.halfDay, exams: [] };
+    const current = slotMap.get(key) ?? { date: exam.date, halfDay: exam.halfDay, exams: [] as AvailabilityExam[] };
     current.exams.push(exam);
     slotMap.set(key, current);
   }

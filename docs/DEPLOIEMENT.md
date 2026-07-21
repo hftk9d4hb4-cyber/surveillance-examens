@@ -1,56 +1,77 @@
-# Déploiement Vercel + Neon
+# Déploiement V1.1 sur GitHub, Vercel et Neon
 
-## Import GitHub
+## 1. Préparation du dépôt
 
-Décompresser l'archive et importer **le contenu intérieur** du dossier à la racine du dépôt `surveillance-examens`.
-
-La racine GitHub doit contenir directement :
+Le contenu de l’archive doit être placé à la racine du dépôt. La racine doit notamment contenir :
 
 ```text
 app/
 components/
-docs/
 lib/
 prisma/
 public/
 tests/
+types/
 package.json
 package-lock.json
 vercel.json
 ```
 
-Ne pas importer `.env`, `.env.local`, `node_modules` ou `.next`.
+Ne déposez pas le dossier parent dans le dépôt. Ne déposez jamais de fichier `.env`.
 
-## Processus automatique
+## 2. Variables Vercel
 
-`vercel.json` demande à Vercel d'exécuter `npm run vercel-build`. Ce script :
+Dans **Project Settings → Environment Variables**, configurez au minimum :
 
-1. utilise `DATABASE_URL` ou, à défaut, `POSTGRES_PRISMA_URL` ;
-2. utilise `DATABASE_URL_UNPOOLED`, `POSTGRES_URL_NON_POOLING` ou `POSTGRES_URL` pour les migrations ;
-3. génère le client Prisma ;
-4. applique la migration PostgreSQL initiale et les migrations futures ;
-5. compile l'application Next.js.
+- `DATABASE_URL`
+- `DATABASE_URL_UNPOOLED`
+- `NEXTAUTH_SECRET`
+- `NEXTAUTH_URL`
+- `ADMIN_EMAIL`
+- `SETUP_TOKEN`
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_USER`
+- `SMTP_PASS`
+- `MAIL_FROM`
 
-## Premier administrateur
+Les variables doivent être disponibles dans l’environnement **Production**. `NEXTAUTH_URL` doit correspondre à l’URL réellement utilisée par les utilisateurs.
 
-Au premier accès à `/login`, l'application initialise automatiquement le premier compte administrateur si la base est vide.
+## 3. Commande de build
 
-- adresse : `ADMIN_EMAIL`, ou à défaut `SMTP_USER` ;
-- si `ADMIN_PASSWORD` est absent, un lien d'activation valable 7 jours est envoyé par Gmail ;
-- aucun mot de passe par défaut n'est exposé dans le dépôt.
+`vercel.json` appelle :
 
-## Contrôles après déploiement
+```bash
+npm run vercel-build
+```
 
-- le dernier déploiement doit être `READY` ;
-- `/api/health` doit indiquer `status: ok` et `database: ok` ;
-- `/setup` doit indiquer une base accessible et un SMTP configuré ;
-- le premier lien d'activation doit arriver à `ADMIN_EMAIL` ou `SMTP_USER`.
+Cette commande exécute successivement :
 
-## Données et sécurité
+```bash
+prisma generate
+prisma migrate deploy
+next build
+```
 
-- les secrets restent exclusivement dans Vercel ;
-- la base Neon n'est jamais stockée dans GitHub ;
-- les mots de passe sont hachés avec bcrypt ;
-- les liens d'activation sont stockés sous forme de condensat SHA-256 et expirent après 7 jours ;
-- les opérations sensibles sont journalisées dans `AuditLog` ;
-- les envois SMTP échouent explicitement en production si la configuration Gmail est incomplète.
+La migration est idempotente : après son premier passage, Prisma doit afficher `No pending migrations to apply`.
+
+## 4. Contrôle immédiat
+
+Après un déploiement `READY` :
+
+1. ouvrir `/api/health` et vérifier un statut HTTP 200 ;
+2. ouvrir `/login` ;
+3. vérifier `/setup?token=<SETUP_TOKEN>` ;
+4. activer le premier administrateur ;
+5. exécuter la recette de `RECETTE_V1_1.md`.
+
+## 5. Retour arrière
+
+En cas d’erreur fonctionnelle :
+
+- utiliser le rollback Vercel vers le dernier déploiement `READY` ;
+- ne pas supprimer manuellement les tables Neon ;
+- conserver les journaux du build et les erreurs d’exécution ;
+- corriger le code dans une nouvelle version plutôt que modifier la base directement.
+
+La Release Candidate conserve la migration initiale. Toute base existante doit être sauvegardée avant déploiement et `prisma migrate deploy` doit être exécuté uniquement par le pipeline.

@@ -90,7 +90,7 @@ export function planAssignments(input: {
   const assignments: PlannedAssignment[] = [];
   const alerts: AssignmentPlan["alerts"] = [];
   const sortedExams = [...input.exams].sort((a, b) =>
-    `${a.date}-${a.halfDay}`.localeCompare(`${b.date}-${b.halfDay}`)
+    `${a.date}-${a.halfDay}-${a.id}`.localeCompare(`${b.date}-${b.halfDay}-${b.id}`)
   );
 
   for (const exam of sortedExams) {
@@ -106,7 +106,7 @@ export function planAssignments(input: {
         const dayCount = occupiedByDay.get(teacher.id)?.get(exam.date) ?? 0;
         if (dayCount >= maxPerDay) return false;
         const load = loads.get(teacher.id) ?? 0;
-        if (teacher.quotaAnnual && teacher.quotaAnnual > 0 && load >= teacher.quotaAnnual) return false;
+        if (teacher.quotaAnnual !== null && load >= teacher.quotaAnnual) return false;
         return true;
       })
       .map((teacher) => {
@@ -116,7 +116,7 @@ export function planAssignments(input: {
         const availability = availabilityPoints(status);
         const load = loads.get(teacher.id) ?? 0;
         const loadPenalty = load * 18;
-        const quotaPenalty = teacher.quotaAnnual && teacher.quotaAnnual > 0
+        const quotaPenalty = teacher.quotaAnnual !== null && teacher.quotaAnnual > 0
           ? (load / teacher.quotaAnnual) * 35
           : 0;
         const tieBreaker = deterministicTieBreaker(`${exam.id}|${teacher.id}`);
@@ -133,7 +133,7 @@ export function planAssignments(input: {
           }
         };
       })
-      .sort((a, b) => b.score - a.score || a.teacher.name.localeCompare(b.teacher.name, "fr"));
+      .sort((a, b) => b.score - a.score || a.teacher.name.localeCompare(b.teacher.name, "fr") || a.teacher.id.localeCompare(b.teacher.id));
 
     const selected = candidates.slice(0, needed);
     if (selected.length < needed) {

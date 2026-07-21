@@ -1,14 +1,12 @@
 import ExcelJS from "exceljs";
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { hasStaffRole } from "@/lib/guards";
+import { getActiveApiUser, hasStaffRole } from "@/lib/guards";
 import { prisma } from "@/lib/prisma";
 import { formatDate, halfDayLabel } from "@/lib/format";
 
 export async function GET(request: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user || !hasStaffRole(session.user.role)) return new NextResponse("Accès refusé", { status: 403 });
+  const actor = await getActiveApiUser();
+  if (!actor || !hasStaffRole(actor.role)) return new NextResponse("Accès refusé", { status: 403 });
   const year = new URL(request.url).searchParams.get("year") || undefined;
   const assignments = await prisma.assignment.findMany({ where: year ? { exam: { academicYear: year } } : {}, include: { exam: true, user: true, convocation: true }, orderBy: [{ exam: { date: "asc" } }, { user: { name: "asc" } }] });
   const teachers = await prisma.user.findMany({ where: { role: "TEACHER", isActive: true }, include: { assignments: { where: year ? { exam: { academicYear: year } } : {} } }, orderBy: { name: "asc" } });
