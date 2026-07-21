@@ -1,52 +1,131 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { hasStaffRole } from "@/lib/guards";
 import { prisma } from "@/lib/prisma";
 import { sendConvocationMail } from "@/lib/mail";
 import { writeAudit } from "@/lib/audit";
+import { getActiveApiUser, hasStaffRole } from "@/lib/guards";
+import { isValidAcademicYear } from "@/lib/validation";
+import { todayInTimeZone } from "@/lib/time";
+
+const YEAR_BATCH_SIZE = 25;
+const EXAM_BATCH_SIZE = 200;
 
 export async function POST(request: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user || !hasStaffRole(session.user.role)) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+  const actor = await getActiveApiUser();
+  if (!actor || !hasStaffRole(actor.role)) {
+    return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+  }
+
   const formData = await request.formData();
   const examId = String(formData.get("examId") || "");
-  const year = String(formData.get("academicYear") || "");
+  const requestedYear = String(formData.get("academicYear") || "");
   const resend = formData.get("resend") === "true";
-  const assignments = await prisma.assignment.findMany({
-    where: {
-      ...(examId ? { examId } : {}),
-      ...(year ? { exam: { academicYear: year, status: "PUBLISHED" } } : { exam: { status: "PUBLISHED" } })
+  const today = todayInTimeZone();
+  let effectiveYear = requestedYear;
+
+  if (examId) {
+    const exam = await prisma.exam.findUnique({
+      where: { id: examId },
+      select: { academicYear: true, status: true, date: true }
+    });
+    if (!exam || exam.status !== "PUBLISHED" || exam.date < today) {
+      return NextResponse.redirect(
+        new URL(`/convocations?year=${encodeURIComponent(requestedYear)}&error=exam`, request.url),
+        303
+      );
+    }
+    effectiveYear = exam.academicYear;
+  } else if (!isValidAcademicYear(effectiveYear)) {
+    return NextResponse.redirect(new URL("/convocations?error=year", request.url), 303);
+  }
+
+  if (resend && !examId) {
+    return NextResponse.redirect(
+      new URL(`/convocations?year=${encodeURIComponent(effectiveYear)}&error=resendExamRequired`, request.url),
+      303
+    );
+  }
+
+  const where = {
+    ...(examId ? { examId } : {}),
+    exam: {
+      academicYear: effectiveYear,
+      status: "PUBLISHED" as const,
+      date: { gte: today }
     },
+    user: { isActive: true, role: "TEACHER" as const },
+    ...(resend
+      ? {}
+      : {
+          OR: [
+            { convocation: null },
+            { convocation: { status: { not: "SENT" as const } } }
+          ]
+        })
+  };
+
+  const assignments = await prisma.assignment.findMany({
+    where,
     include: { exam: true, user: true, convocation: true },
-    orderBy: [{ exam: { date: "asc" } }],
-    take: 25
+    orderBy: [{ exam: { date: "asc" } }, { user: { name: "asc" } }],
+    take: examId ? EXAM_BATCH_SIZE : YEAR_BATCH_SIZE
   });
+
   let sent = 0;
-  let skipped = 0;
   let failed = 0;
   for (const assignment of assignments) {
-    if (assignment.convocation?.status === "SENT" && !resend) {
-      skipped += 1;
-      continue;
-    }
     try {
       const result = await sendConvocationMail(assignment.exam, assignment.user);
+      const sentAt = new Date();
       await prisma.convocation.upsert({
         where: { assignmentId: assignment.id },
-        update: { status: "SENT", sentAt: new Date(), lastError: null, messageId: result.messageId },
-        create: { assignmentId: assignment.id, examId: assignment.examId, userId: assignment.userId, status: "SENT", sentAt: new Date(), messageId: result.messageId }
+        update: { status: "SENT", sentAt, lastError: null, messageId: result.messageId },
+        create: {
+          assignmentId: assignment.id,
+          examId: assignment.examId,
+          userId: assignment.userId,
+          status: "SENT",
+          sentAt,
+          messageId: result.messageId
+        }
       });
       sent += 1;
     } catch (error) {
+      const lastError = error instanceof Error ? error.message.slice(0, 500) : "Erreur inconnue";
       await prisma.convocation.upsert({
         where: { assignmentId: assignment.id },
-        update: { status: "ERROR", lastError: error instanceof Error ? error.message.slice(0, 500) : "Erreur inconnue" },
-        create: { assignmentId: assignment.id, examId: assignment.examId, userId: assignment.userId, status: "ERROR", lastError: error instanceof Error ? error.message.slice(0, 500) : "Erreur inconnue" }
+        update: { status: "ERROR", lastError },
+        create: {
+          assignmentId: assignment.id,
+          examId: assignment.examId,
+          userId: assignment.userId,
+          status: "ERROR",
+          lastError
+        }
       });
       failed += 1;
     }
   }
-  await writeAudit({ actorId: session.user.id, action: "CONVOCATIONS_SENT", entity: "Convocation", details: { sent, skipped, failed, examId: examId || null, year: year || null } });
-  return NextResponse.redirect(new URL(`/convocations?year=${encodeURIComponent(year)}&sent=${sent}&skipped=${skipped}&failed=${failed}`, request.url), 303);
+
+  const remaining = resend ? 0 : await prisma.assignment.count({ where });
+  await writeAudit({
+    actorId: actor.id,
+    action: resend ? "CONVOCATIONS_RESENT" : "CONVOCATIONS_SENT",
+    entity: "Convocation",
+    details: {
+      sent,
+      failed,
+      remaining,
+      examined: assignments.length,
+      examId: examId || null,
+      year: effectiveYear
+    }
+  });
+
+  return NextResponse.redirect(
+    new URL(
+      `/convocations?year=${encodeURIComponent(effectiveYear)}&sent=${sent}&failed=${failed}&remaining=${remaining}`,
+      request.url
+    ),
+    303
+  );
 }
