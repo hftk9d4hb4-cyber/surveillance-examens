@@ -14,3 +14,13 @@
 ### Compatibilité
 
 Les examens antérieurs restent valides sans campagne grâce à une relation nullable.
+
+## 1.2.0-alpha.3 — Sprint 3
+
+- moteur d’affectation explicable et configurable ;
+- simulation préalable et validation différée ;
+- contraintes bloquantes intégrant les absences ;
+- préférences, quotas, équité, ancienneté et tiers-temps dans le score ;
+- indice d’équité et anomalies de sous-effectif ;
+- historique des simulations et audit ;
+- tests unitaires complémentaires.

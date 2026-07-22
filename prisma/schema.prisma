@@ -277,3 +277,36 @@ model TeacherPreference {
   @@unique([userId, weekday, halfDay])
   @@index([weekday, halfDay, weight])
 }
+
+
+model AssignmentEngineConfig {
+  id                    String   @id @default(cuid())
+  academicYear          String   @unique
+  availabilityWeight    Int      @default(35)
+  quotaWeight           Int      @default(25)
+  fairnessWeight        Int      @default(20)
+  recencyWeight         Int      @default(10)
+  preferenceWeight      Int      @default(10)
+  extraTimeMultiplier   Float    @default(1.5)
+  maxAssignmentsPerDay  Int      @default(1)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([academicYear])
+}
+
+model AssignmentSimulation {
+  id             String   @id @default(cuid())
+  academicYear   String
+  createdById    String?
+  status         String   @default("PREVIEW")
+  parameters     Json
+  result         Json
+  anomalyCount   Int      @default(0)
+  assignmentCount Int     @default(0)
+  validatedAt    DateTime?
+  createdAt      DateTime @default(now())
+
+  @@index([academicYear, createdAt])
+  @@index([createdById, createdAt])
+}

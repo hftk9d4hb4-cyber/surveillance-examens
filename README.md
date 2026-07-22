@@ -102,3 +102,8 @@ npm run build
 ## V1.2 — Sprint 1
 
 La version alpha 1 ajoute la gestion des campagnes et le rattachement optionnel des examens. Voir `docs/SPRINT_1_V1_2.md`.
+
+
+## V1.2.0-alpha.3 — Sprint 3
+
+Moteur d’affectation explicable : simulation, validation différée, pondérations configurables, contraintes bloquantes, tiers-temps et indice d’équité. Voir `docs/SPRINT_3_V1_2.md`.
