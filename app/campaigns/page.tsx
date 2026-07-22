@@ -43,7 +43,8 @@ export default async function CampaignsPage({
     transition: "Cette transition de statut n’est pas autorisée.",
     empty: "Ajoutez au moins un examen avant de démarrer cette étape.",
     "has-exams": "La campagne contient des examens. Détachez-les avant de la supprimer.",
-    "delete-status": "Seules les campagnes en préparation ou clôturées peuvent être supprimées."
+    "delete-status": "Seules les campagnes en préparation ou clôturées peuvent être supprimées.",
+    access: "Vous n’êtes pas autorisé à piloter cette campagne."
   };
   const error = typeof params.error === "string" ? errorMessages[params.error] : null;
   const defaultYear = academicYearForDate(todayInTimeZone());
@@ -85,7 +86,7 @@ export default async function CampaignsPage({
             <tbody>
               {campaigns.map((campaign) => (
                 <tr key={campaign.id}>
-                  <td><strong>{campaign.name}</strong><br /><span className="muted">{campaign.promotion} · {campaign.academicYear}</span></td>
+                  <td><strong>{campaign.name}</strong><br /><span className="muted">{campaign.promotion} · {campaign.academicYear}</span><br /><Link href={`/campaigns/${campaign.id}/dashboard`}>Ouvrir le pilotage</Link></td>
                   <td>{formatDate(campaign.startDate)} – {formatDate(campaign.endDate)}{campaign.responseDeadline && <><br /><span className="muted">Réponse avant le {formatDate(campaign.responseDeadline)}</span></>}</td>
                   <td>{campaign.manager?.name || <span className="muted">Non attribuée</span>}</td>
                   <td>{campaign.exams.length}<br /><span className="muted">{campaign.exams.reduce((sum: number, exam: { requiredSupervisors: number }) => sum + exam.requiredSupervisors, 0)} postes</span></td>
