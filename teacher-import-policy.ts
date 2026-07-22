@@ -1,0 +1,96 @@
+import nodemailer from "nodemailer";
+import type { Transporter } from "nodemailer";
+import type { Exam, User } from "@prisma/client";
+import { baseUrl, smtpConfigured } from "@/lib/env";
+import { generateConvocationIcs, examStartEnd } from "@/lib/calendar";
+import { formatDate } from "@/lib/format";
+
+export function createTransporter(): Transporter {
+  if (!smtpConfigured()) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("La configuration SMTP est incomplète.");
+    }
+    return nodemailer.createTransport({
+      streamTransport: true,
+      newline: "unix",
+      buffer: true
+    });
+  }
+
+  const port = Number(process.env.SMTP_PORT || 465);
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port,
+    secure: port === 465,
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS
+    }
+  });
+}
+
+export async function sendActivationMail(user: User, token: string) {
+  const link = `${baseUrl()}/activate/${encodeURIComponent(token)}`;
+  return createTransporter().sendMail({
+    from: process.env.MAIL_FROM || process.env.SMTP_USER,
+    to: user.email,
+    subject: "Activation de votre compte — Surveillance des examens",
+    text: `Bonjour ${user.name},
+
+Votre compte a été créé. Définissez votre mot de passe avec ce lien valable 7 jours :
+${link}
+
+Si vous n'êtes pas concerné(e), ignorez ce message.`,
+    html: `<p>Bonjour ${escapeHtml(user.name)},</p><p>Votre compte de gestion des surveillances d'examens a été créé.</p><p><a href="${link}">Définir mon mot de passe</a></p><p>Ce lien est valable 7 jours. Si vous n'êtes pas concerné(e), ignorez ce message.</p>`
+  });
+}
+
+export async function sendConvocationMail(exam: Exam, teacher: User) {
+  const { start, end } = examStartEnd(exam);
+  const ics = generateConvocationIcs(exam, teacher);
+  const startLabel = start.toLocaleTimeString("fr-FR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: exam.timezone
+  });
+  const endLabel = end.toLocaleTimeString("fr-FR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: exam.timezone
+  });
+
+  return createTransporter().sendMail({
+    from: process.env.MAIL_FROM || process.env.SMTP_USER,
+    to: teacher.email,
+    subject: `Convocation surveillance d'examen — ${exam.title}`,
+    text: `Bonjour ${teacher.name},
+
+Vous êtes convoqué(e) pour une surveillance d'examen.
+
+Examen : ${exam.title}
+Promotion : ${exam.promotion}
+Date : ${formatDate(exam.date)}
+Horaire : ${startLabel}–${endLabel}
+Lieu : ${exam.location}
+
+Une invitation calendrier est jointe.
+
+Bien cordialement,
+La scolarité`,
+    html: `<p>Bonjour ${escapeHtml(teacher.name)},</p><p>Vous êtes convoqué(e) pour une surveillance d'examen.</p><table><tr><td><strong>Examen</strong></td><td>${escapeHtml(exam.title)}</td></tr><tr><td><strong>Promotion</strong></td><td>${escapeHtml(exam.promotion)}</td></tr><tr><td><strong>Date</strong></td><td>${formatDate(exam.date)}</td></tr><tr><td><strong>Horaire</strong></td><td>${startLabel}–${endLabel}</td></tr><tr><td><strong>Lieu</strong></td><td>${escapeHtml(exam.location)}</td></tr></table><p>Une invitation calendrier est jointe.</p><p>Bien cordialement,<br>La scolarité</p>`,
+    icalEvent: { filename: "convocation.ics", method: "REQUEST", content: ics }
+  });
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>'"]/g, (char) => {
+    const map: Record<string, string> = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      "'": "&#39;",
+      '"': "&quot;"
+    };
+    return map[char];
+  });
+}

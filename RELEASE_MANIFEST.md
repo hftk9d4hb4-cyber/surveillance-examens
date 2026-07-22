@@ -1,22 +1,27 @@
-# Manifest — surveillance-examens 1.2.0-alpha.1
+import test from "node:test";
+import assert from "node:assert/strict";
+import { canConfirmConvocation, canDeclineConvocation, confirmationLabel, examScheduleFingerprint } from "@/lib/convocation-confirmation";
 
-Livraison intermédiaire du Sprint 1 : campagnes d’examens.
+test("autorise la confirmation uniquement avant une réponse définitive", () => {
+  assert.equal(canConfirmConvocation("PENDING"), true);
+  assert.equal(canConfirmConvocation("READ"), true);
+  assert.equal(canConfirmConvocation("CONFIRMED"), false);
+  assert.equal(canConfirmConvocation("DECLINED"), false);
+});
 
-Contrôles attendus avant déploiement :
+test("autorise un refus motivé après lecture ou confirmation", () => {
+  assert.equal(canDeclineConvocation("PENDING"), true);
+  assert.equal(canDeclineConvocation("READ"), true);
+  assert.equal(canDeclineConvocation("CONFIRMED"), true);
+  assert.equal(canDeclineConvocation("REPLACED"), false);
+});
 
-- `npm ci`
-- `npx prisma validate`
-- `npx prisma generate`
-- `npm run check`
-- `npm run build`
+test("produit des libellés français stables", () => {
+  assert.equal(confirmationLabel("CONFIRMED"), "Confirmée");
+  assert.equal(confirmationLabel("DECLINED"), "Refusée");
+});
 
-Documents de référence :
-
-- `docs/SPRINT_1_V1_2.md`
-- `docs/RECETTE_SPRINT_1_V1_2.md`
-- `prisma/migrations/20260721170000_add_campaigns/migration.sql`
-
-
-## V1.2.0-alpha.3 — Sprint 3
-
-Moteur d’affectation explicable : simulation, validation différée, pondérations configurables, contraintes bloquantes, tiers-temps et indice d’équité. Voir `docs/SPRINT_3_V1_2.md`.
+test("détecte les changements de planification par empreinte", () => {
+  const base = { date: new Date("2026-10-15T00:00:00.000Z"), halfDay: "AM", startTime: "08:00", endTime: "12:00", location: "Faculté" };
+  assert.notEqual(examScheduleFingerprint(base), examScheduleFingerprint({ ...base, location: "Pasteur" }));
+});

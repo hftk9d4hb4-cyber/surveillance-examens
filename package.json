@@ -1,49 +1,24 @@
-{
-  "name": "surveillance-examens",
-  "version": "1.2.0-beta.1-4a",
-  "private": true,
-  "engines": {
-    "node": "22.x"
-  },
-  "scripts": {
-    "dev": "next dev",
-    "build": "prisma generate && next build",
-    "vercel-build": "sh -c 'export DATABASE_URL=\"${DATABASE_URL:-$POSTGRES_PRISMA_URL}\"; export DATABASE_URL_UNPOOLED=\"${DATABASE_URL_UNPOOLED:-${POSTGRES_URL_NON_POOLING:-$POSTGRES_URL}}\"; prisma generate && prisma migrate deploy && next build'",
-    "start": "next start",
-    "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/**/*.test.ts",
-    "db:validate": "prisma validate",
-    "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev",
-    "db:deploy": "prisma migrate deploy",
-    "db:seed": "tsx prisma/seed.ts",
-    "db:studio": "prisma studio",
-    "lint": "eslint .",
-    "check": "npm run lint && npm run typecheck && npm test"
-  },
-  "dependencies": {
-    "@prisma/client": "6.19.0",
-    "bcryptjs": "2.4.3",
-    "csv-parse": "5.6.0",
-    "date-fns": "4.1.0",
-    "date-fns-tz": "3.2.0",
-    "exceljs": "4.4.0",
-    "next": "15.5.20",
-    "next-auth": "4.24.14",
-    "nodemailer": "7.0.7",
-    "react": "19.1.1",
-    "react-dom": "19.1.1"
-  },
-  "devDependencies": {
-    "@types/bcryptjs": "2.4.6",
-    "@types/node": "22.15.3",
-    "@types/nodemailer": "7.0.0",
-    "@types/react": "19.1.2",
-    "@types/react-dom": "19.1.2",
-    "eslint": "9.25.1",
-    "eslint-config-next": "15.5.20",
-    "prisma": "6.19.0",
-    "tsx": "4.20.6",
-    "typescript": "5.8.3"
-  }
-}
+import test from "node:test";
+import assert from "node:assert/strict";
+import { academicYearForDate, dateKey } from "@/lib/format";
+import { todayInTimeZone } from "@/lib/time";
+
+test("utilise le jour civil de Paris après minuit local", () => {
+  const now = new Date("2026-07-20T22:30:00.000Z");
+  assert.equal(dateKey(todayInTimeZone(now)), "2026-07-21");
+});
+
+test("gère le changement d’année en heure de Paris", () => {
+  const now = new Date("2026-12-31T23:30:00.000Z");
+  assert.equal(dateKey(todayInTimeZone(now)), "2027-01-01");
+});
+
+test("permet un fuseau explicite pour les contrôles techniques", () => {
+  const now = new Date("2026-07-20T22:30:00.000Z");
+  assert.equal(dateKey(todayInTimeZone(now, "UTC")), "2026-07-20");
+});
+
+test("calcule l’année universitaire à partir de la date civile", () => {
+  const now = new Date("2026-08-31T22:30:00.000Z");
+  assert.equal(academicYearForDate(todayInTimeZone(now)), "2026-2027");
+});

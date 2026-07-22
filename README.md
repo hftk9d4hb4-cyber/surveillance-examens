@@ -1,114 +1,107 @@
-# Surveillance des examens — V1.2.0-alpha.1-rc.2
+import test from "node:test";
+import assert from "node:assert/strict";
+import { parseExamRows, parseTeacherRows } from "@/lib/imports";
 
-Application métier de la Faculté de médecine destinée à organiser les surveillances d’examens : enseignants, examens, disponibilités, affectations, convocations et exports.
+test("importe un enseignant avec en-têtes français", () => {
+  const result = parseTeacherRows([{ nom: "Durand", prenom: "Anne", email: "ANNE@EXEMPLE.FR", service: "Chirurgie", specialite: "Digestif", quota_annuel: 4, actif: "Oui" }]);
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.data[0].email, "anne@exemple.fr");
+  assert.equal(result.data[0].name, "Anne Durand");
+  assert.equal(result.data[0].quotaAnnual, 4);
+});
 
-## Périmètre de la Release Candidate
+test("signale une adresse électronique invalide", () => {
+  const result = parseTeacherRows([{ nom: "Durand", email: "invalide" }]);
+  assert.equal(result.data.length, 0);
+  assert.equal(result.errors.length, 1);
+});
 
-- authentification par adresse électronique et mot de passe ;
-- rôles **Enseignant**, **Gestionnaire** et **Administrateur** ;
-- import XLSX/CSV des enseignants et des examens ;
-- déclaration des disponibilités par demi-journée ;
-- moteur d’affectation déterministe avec quotas, indisponibilités et limite d’une surveillance par jour ;
-- corrections manuelles et verrouillage des affectations ;
-- convocations par e-mail avec invitation calendrier `.ics` versionnée ;
-- export Excel du planning et de la charge ;
-- journal des imports et journal d’audit.
+test("importe un examen et calcule l'année universitaire", () => {
+  const result = parseExamRows([{ date: "15/10/2026", demi_journee: "Matin", intitule: "ECOS", promotion: "DFASM2", lieu: "Faculté", nb_surveillants: 8, heure_debut: "08:00", heure_fin: "12:00" }]);
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.data[0].halfDay, "AM");
+  assert.equal(result.data[0].academicYear, "2026-2027");
+  assert.equal(result.data[0].requiredSupervisors, 8);
+});
 
-## Rôles
+test("refuse une date civile inexistante", () => {
+  const result = parseExamRows([{ date: "31/02/2026", demi_journee: "Matin", intitule: "ECOS", promotion: "DFASM2", lieu: "Faculté", nb_surveillants: 2 }]);
+  assert.equal(result.data.length, 0);
+  assert.ok(result.errors.some((error) => error.message.includes("inexistante")));
+});
 
-| Fonction | Enseignant | Gestionnaire | Administrateur |
-|---|:---:|:---:|:---:|
-| Renseigner ses disponibilités | Oui | Oui | Oui |
-| Consulter ses surveillances | Oui | Oui | Oui |
-| Gérer les examens | Non | Oui | Oui |
-| Calculer et corriger les affectations | Non | Oui | Oui |
-| Envoyer les convocations | Non | Oui | Oui |
-| Importer les examens | Non | Oui | Oui |
-| Importer et activer les enseignants | Non | Non | Oui |
-| Gérer les rôles | Non | Non | Oui |
+test("refuse une heure hors plage", () => {
+  const result = parseExamRows([{ date: "15/10/2026", demi_journee: "Matin", intitule: "ECOS", promotion: "DFASM2", lieu: "Faculté", nb_surveillants: 2, heure_debut: "25:00", heure_fin: "26:00" }]);
+  assert.equal(result.data.length, 0);
+  assert.ok(result.errors.some((error) => error.message.includes("Horaires")));
+});
 
-## Déploiement
+test("refuse une heure de fin antérieure au début", () => {
+  const result = parseExamRows([{ date: "15/10/2026", demi_journee: "Matin", intitule: "ECOS", promotion: "DFASM2", lieu: "Faculté", nb_surveillants: 2, heure_debut: "12:00", heure_fin: "08:00" }]);
+  assert.equal(result.data.length, 0);
+});
 
-Le dépôt est conçu pour GitHub, Vercel et PostgreSQL/Neon. Vercel exécute :
+test("refuse une année universitaire incohérente", () => {
+  const result = parseExamRows([{ date: "15/10/2026", demi_journee: "Matin", intitule: "ECOS", promotion: "DFASM2", lieu: "Faculté", nb_surveillants: 2, annee_universitaire: "2025-2026" }]);
+  assert.equal(result.data.length, 0);
+  assert.ok(result.errors.some((error) => error.message.includes("2026-2027")));
+});
 
-```bash
-prisma generate
-prisma migrate deploy
-next build
-```
+test("signale une adresse électronique dupliquée dans le fichier", () => {
+  const result = parseTeacherRows([
+    { nom: "Durand", prenom: "Anne", email: "anne@example.fr" },
+    { nom: "Durand", prenom: "Anne", email: "anne@example.fr" }
+  ]);
+  assert.equal(result.data.length, 1);
+  assert.ok(result.errors.some((error) => error.message.includes("dupliquée")));
+});
 
-Variables requises :
+test("signale un examen dupliqué dans le fichier", () => {
+  const row = { date: "15/10/2026", demi_journee: "Matin", intitule: "ECOS", promotion: "DFASM2", lieu: "Faculté", nb_surveillants: 2 };
+  const result = parseExamRows([row, row]);
+  assert.equal(result.data.length, 1);
+  assert.ok(result.errors.some((error) => error.message.includes("dupliqué")));
+});
 
-```text
-DATABASE_URL
-DATABASE_URL_UNPOOLED
-NEXTAUTH_SECRET
-NEXTAUTH_URL
-ADMIN_EMAIL
-SETUP_TOKEN
-SMTP_HOST
-SMTP_PORT
-SMTP_USER
-SMTP_PASS
-MAIL_FROM
-```
+test("conserve le numéro de ligne source pour les lignes valides", () => {
+  const teachers = parseTeacherRows([
+    { nom: "Durand", prenom: "Anne", email: "anne@example.fr" },
+    { nom: "Martin", prenom: "Paul", email: "paul@example.fr" }
+  ]);
+  const exams = parseExamRows([
+    { date: "15/10/2026", demi_journee: "Matin", intitule: "ECOS", promotion: "DFASM2", lieu: "Faculté", nb_surveillants: 2 }
+  ]);
+  assert.equal(teachers.data[1].sourceRow, 3);
+  assert.equal(exams.data[0].sourceRow, 2);
+});
 
-`ADMIN_PASSWORD` est facultatif. Sans mot de passe initial conforme, le premier administrateur reçoit un lien d’activation.
+test("refuse les quotas et besoins non entiers", () => {
+  const teachers = parseTeacherRows([{ nom: "Durand", email: "anne@example.fr", quota_annuel: 2.5 }]);
+  const exams = parseExamRows([{ date: "15/10/2026", demi_journee: "Matin", intitule: "ECOS", promotion: "DFASM2", lieu: "Faculté", nb_surveillants: 2.5 }]);
+  assert.equal(teachers.data.length, 0);
+  assert.ok(teachers.errors.some((error) => error.message.includes("entier")));
+  assert.equal(exams.data.length, 0);
+  assert.ok(exams.errors.some((error) => error.message.includes("entier")));
+});
 
-Le diagnostic d’installation est protégé et accessible uniquement par :
+test("refuse les champs d’examen dépassant les limites applicatives", () => {
+  const result = parseExamRows([{
+    date: "15/10/2026",
+    demi_journee: "Matin",
+    intitule: "E".repeat(181),
+    promotion: "DFASM2",
+    lieu: "Faculté",
+    nb_surveillants: 2
+  }]);
+  assert.equal(result.data.length, 0);
+  assert.ok(result.errors.some((error) => error.message.includes("180 caractères")));
+});
 
-```text
-/setup?token=<SETUP_TOKEN>
-```
-
-L’état minimal de l’application est disponible sur `/api/health`.
-
-## Parcours opérationnel
-
-1. L’administrateur importe les enseignants.
-2. Il envoie les liens d’activation.
-3. Un gestionnaire ou un administrateur importe les examens.
-4. Les enseignants renseignent leurs disponibilités.
-5. Le gestionnaire lance le calcul des affectations.
-6. Il corrige et verrouille les exceptions.
-7. Il envoie les convocations par lots.
-8. Il exporte le planning Excel.
-
-Une fois des convocations envoyées pour une année, le recalcul global et la modification des affectations notifiées sont bloqués afin d’éviter de rendre les courriers déjà reçus incohérents. Les corrections restent possibles de manière ciblée avant information des personnes concernées.
-
-## Contrôles locaux
-
-```bash
-npm ci
-npx prisma generate
-npm run check
-npm run build
-```
-
-`npm run check` exécute le lint, la vérification TypeScript et les tests automatisés.
-
-## Documentation
-
-- `docs/GUIDE_UTILISATEUR.md`
-- `docs/GUIDE_ADMINISTRATEUR.md`
-- `docs/FORMAT_IMPORTS.md`
-- `docs/DEPLOIEMENT.md`
-- `docs/RECETTE_V1_1.md`
-- `docs/SECURITE.md`
-- `docs/CONTROLE_FINAL.md`
-- `docs/CHANGELOG.md`
-
-
-## V1.2 — Sprint 1
-
-La version alpha 1 ajoute la gestion des campagnes et le rattachement optionnel des examens. Voir `docs/SPRINT_1_V1_2.md`.
-
-
-## V1.2.0-alpha.3 — Sprint 3
-
-Moteur d’affectation explicable : simulation, validation différée, pondérations configurables, contraintes bloquantes, tiers-temps et indice d’équité. Voir `docs/SPRINT_3_V1_2.md`.
-
-
-## Version
-
-`1.2.0-beta.1-4a`
+test("refuse les champs enseignants dépassant les limites applicatives", () => {
+  const result = parseTeacherRows([{
+    nom_complet: "N".repeat(181),
+    email: "anne@example.fr"
+  }]);
+  assert.equal(result.data.length, 0);
+  assert.ok(result.errors.some((error) => error.message.includes("180 caractères")));
+});
