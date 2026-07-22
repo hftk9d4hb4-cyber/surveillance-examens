@@ -149,46 +149,115 @@ export function planAssignments(input: {
     if (needed === 0) continue;
     const assignmentWeight = exam.extraTime ? weights.extraTimeMultiplier : 1;
 
-    const candidates = input.teachers.flatMap((teacher) => {
-      const slotKey = `${teacher.id}|${exam.date}|${exam.halfDay}`;
-      const exclusions: string[] = [];
-      const status = input.availabilityBySlot.get(slotKey);
-      if (status === "UNAVAILABLE") exclusions.push("INDISPONIBLE");
-      if (input.absenceSlots?.has(slotKey)) exclusions.push("ABSENCE");
-      if (occupiedSlots.has(slotKey)) exclusions.push("DOUBLE_AFFECTATION");
-      const dayCount = occupiedByDay.get(teacher.id)?.get(exam.date) ?? 0;
-      if (dayCount >= maxPerDay) exclusions.push("LIMITE_JOURNALIERE");
-      const load = loads.get(teacher.id) ?? 0;
-      if (teacher.quotaAnnual !== null && load >= teacher.quotaAnnual) exclusions.push("QUOTA_ATTEINT");
-      if (exclusions.length > 0) return [];
+    const candidates = input.teachers
+      .flatMap((teacher) => {
+        const slotKey = `${teacher.id}|${exam.date}|${exam.halfDay}`;
+        const exclusions: string[] = [];
+        const status = input.availabilityBySlot.get(slotKey);
 
-      const weightedLoad = weightedLoads.get(teacher.id) ?? load;
-      const availabilityPoints = availabilityRatio(status) * weights.availability;
-      const quotaRatio = teacher.quotaAnnual && teacher.quotaAnnual > 0 ? weightedLoad / teacher.quotaAnnual : 0;
-      const quotaPoints = Math.max(0, 1 - quotaRatio) * weights.quota;
-      const maxLoad = Math.max(1, ...Array.from(weightedLoads.values()));
-      const fairnessPoints = Math.max(0, 1 - weightedLoad / maxLoad) * weights.fairness;
-      const recencyPoints = Math.min(1, daysBetween(teacher.lastAssignmentDate, exam.date) / 90) * weights.recency;
-      const preferenceWeight = input.preferenceBySlot?.get(`${teacher.id}|${new Date(`${exam.date}T12:00:00Z`).getUTCDay()}|${exam.halfDay}`) ?? 0;
-      const preferencePoints = Math.max(-1, Math.min(1, preferenceWeight)) * weights.preference;
-      const tieBreaker = deterministicTieBreaker(`${exam.id}|${teacher.id}`);
-      const score = Math.max(0, Math.min(100, availabilityPoints + quotaPoints + fairnessPoints + recencyPoints + preferencePoints + tieBreaker));
-      return [{ teacher, score, details: { availability: status ?? "NO_RESPONSE", availabilityPoints, quotaPoints, fairnessPoints, recencyPoints, preferencePoints, preferenceWeight, weightedLoadBefore: weightedLoad, assignmentWeight, tieBreaker, exclusions } }];
-    }).sort((a, b) => b.score - a.score || a.teacher.name.localeCompare(b.teacher.name, "fr") || a.teacher.id.localeCompare(b.teacher.id));
+        if (status === "UNAVAILABLE") exclusions.push("INDISPONIBLE");
+        if (input.absenceSlots?.has(slotKey)) exclusions.push("ABSENCE");
+        if (occupiedSlots.has(slotKey)) exclusions.push("DOUBLE_AFFECTATION");
+
+        const dayCount = occupiedByDay.get(teacher.id)?.get(exam.date) ?? 0;
+        if (dayCount >= maxPerDay) exclusions.push("LIMITE_JOURNALIERE");
+
+        const load = loads.get(teacher.id) ?? 0;
+        if (teacher.quotaAnnual !== null && load >= teacher.quotaAnnual) {
+          exclusions.push("QUOTA_ATTEINT");
+        }
+
+        if (exclusions.length > 0) return [];
+
+        const weightedLoad = weightedLoads.get(teacher.id) ?? load;
+        const availabilityPoints = availabilityRatio(status) * weights.availability;
+        const quotaRatio =
+          teacher.quotaAnnual && teacher.quotaAnnual > 0
+            ? weightedLoad / teacher.quotaAnnual
+            : 0;
+        const quotaPoints = Math.max(0, 1 - quotaRatio) * weights.quota;
+        const maxLoad = Math.max(1, ...Array.from(weightedLoads.values()));
+        const fairnessPoints =
+          Math.max(0, 1 - weightedLoad / maxLoad) * weights.fairness;
+        const recencyPoints =
+          Math.min(1, daysBetween(teacher.lastAssignmentDate, exam.date) / 90) *
+          weights.recency;
+        const preferenceWeight =
+          input.preferenceBySlot?.get(
+            `${teacher.id}|${new Date(`${exam.date}T12:00:00Z`).getUTCDay()}|${exam.halfDay}`
+          ) ?? 0;
+        const preferencePoints =
+          Math.max(-1, Math.min(1, preferenceWeight)) * weights.preference;
+        const tieBreaker = deterministicTieBreaker(`${exam.id}|${teacher.id}`);
+        const score = Math.max(
+          0,
+          Math.min(
+            100,
+            availabilityPoints +
+              quotaPoints +
+              fairnessPoints +
+              recencyPoints +
+              preferencePoints +
+              tieBreaker
+          )
+        );
+
+        const details: ScoreDetails = {
+          availability: status ?? "NO_RESPONSE",
+          availabilityPoints,
+          quotaPoints,
+          fairnessPoints,
+          recencyPoints,
+          preferencePoints,
+          preferenceWeight,
+          weightedLoadBefore: weightedLoad,
+          assignmentWeight,
+          tieBreaker,
+          exclusions
+        };
+
+        return [{ teacher, score, details }];
+      })
+      .sort(
+        (a, b) =>
+          b.score - a.score ||
+          a.teacher.name.localeCompare(b.teacher.name, "fr") ||
+          a.teacher.id.localeCompare(b.teacher.id)
+      );
 
     const selected = candidates.slice(0, needed);
+
     if (selected.length < needed) {
       const missing = needed - selected.length;
-      alerts.push({ examId: exam.id, missing, availableCandidates: candidates.length });
-      anomalies.push({ type: "UNDERSTAFFED", examId: exam.id, message: `${missing} surveillant(s) manquant(s).`, severity: "error" });
+      alerts.push({
+        examId: exam.id,
+        missing,
+        availableCandidates: candidates.length
+      });
+      anomalies.push({
+        type: "UNDERSTAFFED",
+        examId: exam.id,
+        message: `${missing} surveillant(s) manquant(s).`,
+        severity: "error"
+      });
     }
 
     for (const candidate of selected) {
-      assignments.push({ examId: exam.id, userId: candidate.teacher.id, score: candidate.score, scoreDetails: candidate.details });
+      assignments.push({
+        examId: exam.id,
+        userId: candidate.teacher.id,
+        score: candidate.score,
+        scoreDetails: candidate.details
+      });
       loads.set(candidate.teacher.id, (loads.get(candidate.teacher.id) ?? 0) + 1);
-      weightedLoads.set(candidate.teacher.id, (weightedLoads.get(candidate.teacher.id) ?? 0) + assignmentWeight);
+      weightedLoads.set(
+        candidate.teacher.id,
+        (weightedLoads.get(candidate.teacher.id) ?? 0) + assignmentWeight
+      );
       occupiedSlots.add(`${candidate.teacher.id}|${exam.date}|${exam.halfDay}`);
-      const dayMap = occupiedByDay.get(candidate.teacher.id) ?? new Map<string, number>();
+
+      const dayMap =
+        occupiedByDay.get(candidate.teacher.id) ?? new Map<string, number>();
       dayMap.set(exam.date, (dayMap.get(exam.date) ?? 0) + 1);
       occupiedByDay.set(candidate.teacher.id, dayMap);
     }
