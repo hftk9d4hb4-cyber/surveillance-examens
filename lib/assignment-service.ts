@@ -78,7 +78,7 @@ export async function generateAssignments(academicYear: string, actorId: string)
     maxAssignmentsPerDay: 1
   });
 
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx: Pick<typeof prisma, "assignment">) => {
     if (examIds.length > 0) {
       await tx.assignment.deleteMany({ where: { examId: { in: examIds }, locked: false } });
     }

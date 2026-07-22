@@ -1,14 +1,17 @@
-# Manifeste de livraison
+# Manifest — surveillance-examens 1.2.0-alpha.1
 
-- Produit : Surveillance des examens
-- Version : 1.1.0-rc.2
-- Date : 20 juillet 2026
-- Statut : Release Candidate apte à la préproduction
-- Tests automatisés : 38/38
-- Lint : réussi
-- TypeScript : réussi
-- Rapport : `docs/RAPPORT_STABILISATION_RC2.md`
-- Recette : `docs/RECETTE_V1_1.md`
-- Publication : `docs/PUBLICATION_GITHUB_RC2.md`
+Livraison intermédiaire du Sprint 1 : campagnes d’examens.
 
-L’archive ne contient ni dépendances installées, ni build Next.js, ni fichier `.env`, ni secret de production.
+Contrôles attendus avant déploiement :
+
+- `npm ci`
+- `npx prisma validate`
+- `npx prisma generate`
+- `npm run check`
+- `npm run build`
+
+Documents de référence :
+
+- `docs/SPRINT_1_V1_2.md`
+- `docs/RECETTE_SPRINT_1_V1_2.md`
+- `prisma/migrations/20260721170000_add_campaigns/migration.sql`

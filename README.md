@@ -1,4 +1,4 @@
-# Surveillance des examens — V1.1.0-rc.2
+# Surveillance des examens — V1.2.0-alpha.1-rc.2
 
 Application métier de la Faculté de médecine destinée à organiser les surveillances d’examens : enseignants, examens, disponibilités, affectations, convocations et exports.
 
@@ -97,3 +97,8 @@ npm run build
 - `docs/SECURITE.md`
 - `docs/CONTROLE_FINAL.md`
 - `docs/CHANGELOG.md`
+
+
+## V1.2 — Sprint 1
+
+La version alpha 1 ajoute la gestion des campagnes et le rattachement optionnel des examens. Voir `docs/SPRINT_1_V1_2.md`.
