@@ -26,6 +26,15 @@ enum AvailabilityStatus {
   STRONG_AVAILABLE
 }
 
+enum AbsenceType {
+  VACATION
+  CONFERENCE
+  TRAINING
+  MISSION
+  PERSONAL
+  OTHER
+}
+
 enum ExamStatus {
   DRAFT
   PUBLISHED
@@ -78,6 +87,8 @@ model User {
   activationSentAt DateTime?
   lastLoginAt      DateTime?
   availabilities   Availability[]
+  absencePeriods   TeacherAbsence[]
+  preferences      TeacherPreference[]
   assignments      Assignment[]
   convocations     Convocation[]
   activationTokens ActivationToken[]
@@ -235,4 +246,34 @@ model AuditLog {
 
   @@index([entity, entityId])
   @@index([createdAt])
+}
+
+
+model TeacherAbsence {
+  id        String      @id @default(cuid())
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      AbsenceType
+  startDate DateTime    @db.Date
+  endDate   DateTime    @db.Date
+  comment   String?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([userId, startDate, endDate])
+  @@index([startDate, endDate])
+}
+
+model TeacherPreference {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weekday   Int
+  halfDay   HalfDay
+  weight    Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, weekday, halfDay])
+  @@index([weekday, halfDay, weight])
 }
