@@ -1,0 +1,134 @@
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { sendConvocationMail } from "@/lib/mail";
+import { writeAudit } from "@/lib/audit";
+import { getActiveApiUser, hasStaffRole } from "@/lib/guards";
+import { isValidAcademicYear } from "@/lib/validation";
+import { todayInTimeZone } from "@/lib/time";
+import { examScheduleFingerprint } from "@/lib/convocation-confirmation";
+
+const YEAR_BATCH_SIZE = 25;
+const EXAM_BATCH_SIZE = 200;
+
+export async function POST(request: Request) {
+  const actor = await getActiveApiUser();
+  if (!actor || !hasStaffRole(actor.role)) {
+    return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+  }
+
+  const formData = await request.formData();
+  const examId = String(formData.get("examId") || "");
+  const requestedYear = String(formData.get("academicYear") || "");
+  const resend = formData.get("resend") === "true";
+  const today = todayInTimeZone();
+  let effectiveYear = requestedYear;
+
+  if (examId) {
+    const exam = await prisma.exam.findUnique({
+      where: { id: examId },
+      select: { academicYear: true, status: true, date: true }
+    });
+    if (!exam || exam.status !== "PUBLISHED" || exam.date < today) {
+      return NextResponse.redirect(
+        new URL(`/convocations?year=${encodeURIComponent(requestedYear)}&error=exam`, request.url),
+        303
+      );
+    }
+    effectiveYear = exam.academicYear;
+  } else if (!isValidAcademicYear(effectiveYear)) {
+    return NextResponse.redirect(new URL("/convocations?error=year", request.url), 303);
+  }
+
+  if (resend && !examId) {
+    return NextResponse.redirect(
+      new URL(`/convocations?year=${encodeURIComponent(effectiveYear)}&error=resendExamRequired`, request.url),
+      303
+    );
+  }
+
+  const where = {
+    ...(examId ? { examId } : {}),
+    exam: {
+      academicYear: effectiveYear,
+      status: "PUBLISHED" as const,
+      date: { gte: today }
+    },
+    user: { isActive: true, role: "TEACHER" as const },
+    ...(resend
+      ? {}
+      : {
+          OR: [
+            { convocation: null },
+            { convocation: { status: { not: "SENT" as const } } }
+          ]
+        })
+  };
+
+  const assignments = await prisma.assignment.findMany({
+    where,
+    include: { exam: true, user: true, convocation: true },
+    orderBy: [{ exam: { date: "asc" } }, { user: { name: "asc" } }],
+    take: examId ? EXAM_BATCH_SIZE : YEAR_BATCH_SIZE
+  });
+
+  let sent = 0;
+  let failed = 0;
+  for (const assignment of assignments) {
+    try {
+      const result = await sendConvocationMail(assignment.exam, assignment.user);
+      const sentAt = new Date();
+      await prisma.convocation.upsert({
+        where: { assignmentId: assignment.id },
+        update: { status: "SENT", sentAt, lastError: null, messageId: result.messageId, scheduleFingerprint: examScheduleFingerprint(assignment.exam), scheduleChangedAt: null },
+        create: {
+          assignmentId: assignment.id,
+          examId: assignment.examId,
+          userId: assignment.userId,
+          status: "SENT",
+          confirmationStatus: "PENDING",
+          scheduleFingerprint: examScheduleFingerprint(assignment.exam),
+          sentAt,
+          messageId: result.messageId
+        }
+      });
+      sent += 1;
+    } catch (error) {
+      const lastError = error instanceof Error ? error.message.slice(0, 500) : "Erreur inconnue";
+      await prisma.convocation.upsert({
+        where: { assignmentId: assignment.id },
+        update: { status: "ERROR", lastError },
+        create: {
+          assignmentId: assignment.id,
+          examId: assignment.examId,
+          userId: assignment.userId,
+          status: "ERROR",
+          lastError
+        }
+      });
+      failed += 1;
+    }
+  }
+
+  const remaining = resend ? 0 : await prisma.assignment.count({ where });
+  await writeAudit({
+    actorId: actor.id,
+    action: resend ? "CONVOCATIONS_RESENT" : "CONVOCATIONS_SENT",
+    entity: "Convocation",
+    details: {
+      sent,
+      failed,
+      remaining,
+      examined: assignments.length,
+      examId: examId || null,
+      year: effectiveYear
+    }
+  });
+
+  return NextResponse.redirect(
+    new URL(
+      `/convocations?year=${encodeURIComponent(effectiveYear)}&sent=${sent}&failed=${failed}&remaining=${remaining}`,
+      request.url
+    ),
+    303
+  );
+}
