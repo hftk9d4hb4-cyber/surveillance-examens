@@ -1,3 +1,10 @@
+# 1.2.0-beta.1-4a
+
+- centre de pilotage de campagne ;
+- KPI et progression ;
+- moteur d’alertes auditables ;
+- contrôles d’accès par gestionnaire.
+
 # Changelog
 
 ## 1.2.0-alpha.1 — Sprint 1

@@ -60,6 +60,24 @@ enum ConvocationStatus {
   ERROR
 }
 
+
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum AlertType {
+  MISSING_AVAILABILITY
+  UNDERSTAFFED_EXAM
+  DOUBLE_ASSIGNMENT
+  UNAVAILABLE_TEACHER
+  QUOTA_EXCEEDED
+  EXTRA_TIME_UNDERSTAFFED
+  DATA_QUALITY
+}
+
 enum ImportKind {
   TEACHERS
   EXAMS
@@ -93,6 +111,7 @@ model User {
   convocations     Convocation[]
   activationTokens ActivationToken[]
   campaignsManaged Campaign[] @relation("CampaignManager")
+  alertsResolved   CampaignAlert[] @relation("CampaignAlertResolver")
   importLogs       ImportLog[]        @relation("ImportCreator")
   auditLogs        AuditLog[]         @relation("AuditActor")
   createdAt        DateTime           @default(now())
@@ -127,6 +146,7 @@ model Campaign {
   managerId           String?
   manager             User?          @relation("CampaignManager", fields: [managerId], references: [id], onDelete: SetNull)
   exams               Exam[]
+  alerts              CampaignAlert[]
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
 
@@ -309,4 +329,28 @@ model AssignmentSimulation {
 
   @@index([academicYear, createdAt])
   @@index([createdById, createdAt])
+}
+
+
+model CampaignAlert {
+  id            String        @id @default(cuid())
+  campaignId    String
+  campaign      Campaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  type          AlertType
+  severity      AlertSeverity
+  fingerprint   String
+  title         String
+  message       String
+  entityType    String?
+  entityId      String?
+  resolutionUrl String?
+  resolvedAt    DateTime?
+  resolvedById  String?
+  resolvedBy    User?         @relation("CampaignAlertResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@unique([campaignId, fingerprint])
+  @@index([campaignId, resolvedAt, severity])
+  @@index([type, createdAt])
 }
