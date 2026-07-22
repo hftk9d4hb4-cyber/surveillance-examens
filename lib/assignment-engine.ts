@@ -173,7 +173,20 @@ export function planAssignments(input: {
       const preferencePoints = Math.max(-1, Math.min(1, preferenceWeight)) * weights.preference;
       const tieBreaker = deterministicTieBreaker(`${exam.id}|${teacher.id}`);
       const score = Math.max(0, Math.min(100, availabilityPoints + quotaPoints + fairnessPoints + recencyPoints + preferencePoints + tieBreaker));
-      return [{ teacher, score, details: { availability: status ?? "NO_RESPONSE", availabilityPoints, quotaPoints, fairnessPoints, recencyPoints, preferencePoints, preferenceWeight, weightedLoadBefore: weightedLoad, assignmentWeight, tieBreaker, exclusions } }];
+      const details: ScoreDetails = {
+        availability: status ?? "NO_RESPONSE",
+        availabilityPoints,
+        quotaPoints,
+        fairnessPoints,
+        recencyPoints,
+        preferencePoints,
+        preferenceWeight,
+        weightedLoadBefore: weightedLoad,
+        assignmentWeight,
+        tieBreaker,
+        exclusions
+      };
+      return [{ teacher, score, details }];
     }).sort((a, b) => b.score - a.score || a.teacher.name.localeCompare(b.teacher.name, "fr") || a.teacher.id.localeCompare(b.teacher.id));
 
     const selected = candidates.slice(0, needed);
