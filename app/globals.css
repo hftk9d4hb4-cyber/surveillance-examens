@@ -187,3 +187,15 @@ tbody tr:hover { background: #fbfdff; }
 .nav-button:focus-visible {
   text-decoration: underline;
 }
+
+.compact-form {
+  min-width: min(560px, 80vw);
+  margin-top: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--border, #d8dee8);
+  border-radius: 0.75rem;
+  background: var(--surface, #fff);
+}
+
+details > summary { cursor: pointer; list-style: none; }
+details > summary::-webkit-details-marker { display: none; }
