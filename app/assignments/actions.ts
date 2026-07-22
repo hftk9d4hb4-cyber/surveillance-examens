@@ -68,3 +68,59 @@ export async function toggleAssignmentLock(formData: FormData) {
   revalidatePath("/assignments");
   redirect(`/assignments?year=${encodeURIComponent(assignment.exam.academicYear)}`);
 }
+
+export async function saveAssignmentSettings(formData: FormData) {
+  const { user: actor } = await requireStaff();
+  const academicYear = String(formData.get("academicYear") || "");
+  const integer = (name: string, fallback: number) => Math.max(0, Number.parseInt(String(formData.get(name) || fallback), 10) || fallback);
+  const multiplier = Math.max(1, Math.min(3, Number(String(formData.get("extraTimeMultiplier") || "1.5")) || 1.5));
+  await prisma.assignmentEngineConfig.upsert({
+    where: { academicYear },
+    create: {
+      academicYear,
+      availabilityWeight: integer("availabilityWeight", 35),
+      quotaWeight: integer("quotaWeight", 25),
+      fairnessWeight: integer("fairnessWeight", 20),
+      recencyWeight: integer("recencyWeight", 10),
+      preferenceWeight: integer("preferenceWeight", 10),
+      extraTimeMultiplier: multiplier,
+      maxAssignmentsPerDay: Math.max(1, integer("maxAssignmentsPerDay", 1))
+    },
+    update: {
+      availabilityWeight: integer("availabilityWeight", 35),
+      quotaWeight: integer("quotaWeight", 25),
+      fairnessWeight: integer("fairnessWeight", 20),
+      recencyWeight: integer("recencyWeight", 10),
+      preferenceWeight: integer("preferenceWeight", 10),
+      extraTimeMultiplier: multiplier,
+      maxAssignmentsPerDay: Math.max(1, integer("maxAssignmentsPerDay", 1))
+    }
+  });
+  await writeAudit({ actorId: actor.id, action: "ASSIGNMENT_SETTINGS_UPDATED", entity: "AcademicYear", entityId: academicYear });
+  revalidatePath("/assignments");
+  redirect(`/assignments?year=${encodeURIComponent(academicYear)}&settings=1`);
+}
+
+export async function createAssignmentSimulation(formData: FormData) {
+  const { user: actor } = await requireStaff();
+  const academicYear = String(formData.get("academicYear") || "");
+  const { simulateAssignments } = await import("@/lib/assignment-service");
+  try {
+    const { simulation } = await simulateAssignments(academicYear, actor.id);
+    revalidatePath("/assignments");
+    redirect(`/assignments?year=${encodeURIComponent(academicYear)}&simulation=${simulation.id}`);
+  } catch (error) {
+    if (error instanceof Error && error.name === "AssignmentGenerationBlockedError") redirect(`/assignments?year=${encodeURIComponent(academicYear)}&error=notified`);
+    throw error;
+  }
+}
+
+export async function validateSimulationAction(formData: FormData) {
+  const { user: actor } = await requireStaff();
+  const simulationId = String(formData.get("simulationId") || "");
+  const academicYear = String(formData.get("academicYear") || "");
+  const { validateAssignmentSimulation } = await import("@/lib/assignment-service");
+  await validateAssignmentSimulation(simulationId, actor.id);
+  revalidatePath("/assignments");
+  redirect(`/assignments?year=${encodeURIComponent(academicYear)}&validated=1`);
+}
