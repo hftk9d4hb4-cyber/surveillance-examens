@@ -86,7 +86,7 @@ export default async function CampaignsPage({
             <tbody>
               {campaigns.map((campaign) => (
                 <tr key={campaign.id}>
-                  <td><strong>{campaign.name}</strong><br /><span className="muted">{campaign.promotion} · {campaign.academicYear}</span><br /><Link href={`/campaigns/${campaign.id}/dashboard`}>Ouvrir le pilotage</Link></td>
+                  <td><strong>{campaign.name}</strong><br /><span className="muted">{campaign.promotion} · {campaign.academicYear}</span><br /><Link href={`/campaigns/${campaign.id}/dashboard`}>Ouvrir le pilotage</Link> · <Link href={`/campaigns/${campaign.id}/reminders`}>Relances</Link></td>
                   <td>{formatDate(campaign.startDate)} – {formatDate(campaign.endDate)}{campaign.responseDeadline && <><br /><span className="muted">Réponse avant le {formatDate(campaign.responseDeadline)}</span></>}</td>
                   <td>{campaign.manager?.name || <span className="muted">Non attribuée</span>}</td>
                   <td>{campaign.exams.length}<br /><span className="muted">{campaign.exams.reduce((sum: number, exam: { requiredSupervisors: number }) => sum + exam.requiredSupervisors, 0)} postes</span></td>
