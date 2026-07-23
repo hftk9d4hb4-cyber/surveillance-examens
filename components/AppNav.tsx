@@ -18,6 +18,7 @@ export async function AppNav() {
         <nav className="nav-links" aria-label="Navigation principale">
           <Link href="/dashboard">Tableau de bord</Link>
           <Link href="/availability">Disponibilités</Link>
+          {role === "TEACHER" && <Link href="/my-convocations">Mes convocations</Link>}
           <Link href="/teacher-profile">Mon profil</Link>
           {hasStaffRole(role) && <Link href="/campaigns">Campagnes</Link>}
           {hasStaffRole(role) && <Link href="/teachers">Enseignants</Link>}

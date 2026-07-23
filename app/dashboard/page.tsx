@@ -23,7 +23,7 @@ export default async function DashboardPage({
     const [myAssignments, futureSlots, myAvailabilities] = await Promise.all([
       prisma.assignment.findMany({
         where: { userId: user.id, exam: { date: { gte: today }, status: "PUBLISHED" } },
-        include: { exam: true, convocation: true },
+        include: { exam: true, convocation: true, acknowledgement: true },
         orderBy: { exam: { date: "asc" } },
         take: 20
       }),
@@ -51,12 +51,12 @@ export default async function DashboardPage({
         <div className="grid">
           <div className="col-4"><StatCard value={myAssignments.length} label="surveillances à venir" /></div>
           <div className="col-4"><StatCard value={`${completion}%`} label="disponibilités renseignées" note={`${myAvailabilities}/${slotCount} demi-journées`} /></div>
-          <div className="col-4"><StatCard value={myAssignments.filter((item) => item.convocation?.status === "SENT").length} label="convocations reçues" /></div>
+          <div className="col-4"><StatCard value={myAssignments.filter((item) => item.convocation?.status === "SENT" && !item.acknowledgement).length} label="convocations à confirmer" /></div>
         </div>
         <div className="card">
           <div className="page-header">
             <div><h2>Mes prochaines surveillances</h2></div>
-            <Link className="button secondary" href="/availability">Renseigner mes disponibilités</Link>
+            <div className="actions"><Link className="button secondary" href="/availability">Renseigner mes disponibilités</Link><Link className="button" href="/my-convocations">Mes convocations</Link></div>
           </div>
           <div className="table-wrap">
             <table>
@@ -71,7 +71,9 @@ export default async function DashboardPage({
                     <td>{assignment.exam.startTime}–{assignment.exam.endTime}</td>
                     <td>
                       {assignment.convocation?.status === "SENT"
-                        ? <StatusBadge label="Envoyée" tone="green" />
+                        ? assignment.acknowledgement
+                          ? <StatusBadge label="Confirmée" tone="green" />
+                          : <StatusBadge label="À confirmer" tone="amber" />
                         : assignment.convocation?.status === "ERROR"
                           ? <StatusBadge label="Erreur" tone="red" />
                           : <StatusBadge label="À venir" tone="amber" />}

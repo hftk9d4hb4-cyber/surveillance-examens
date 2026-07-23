@@ -102,7 +102,7 @@ Surveillance des examens`,
   });
 }
 
-export async function sendConvocationMail(exam: Exam, teacher: User) {
+export async function sendConvocationMail(exam: Exam, teacher: User, assignmentId: string) {
   const { start, end } = examStartEnd(exam);
   const ics = generateConvocationIcs(exam, teacher);
   const startLabel = start.toLocaleTimeString("fr-FR", {
@@ -115,6 +115,7 @@ export async function sendConvocationMail(exam: Exam, teacher: User) {
     minute: "2-digit",
     timeZone: exam.timezone
   });
+  const acknowledgementLink = `${baseUrl()}/my-convocations?assignment=${encodeURIComponent(assignmentId)}`;
 
   return createTransporter().sendMail({
     from: process.env.MAIL_FROM || process.env.SMTP_USER,
@@ -131,10 +132,12 @@ Horaire : ${startLabel}–${endLabel}
 Lieu : ${exam.location}
 
 Une invitation calendrier est jointe.
+Confirmez la prise de connaissance de cette convocation :
+${acknowledgementLink}
 
 Bien cordialement,
 La scolarité`,
-    html: `<p>Bonjour ${escapeHtml(teacher.name)},</p><p>Vous êtes convoqué(e) pour une surveillance d'examen.</p><table><tr><td><strong>Examen</strong></td><td>${escapeHtml(exam.title)}</td></tr><tr><td><strong>Promotion</strong></td><td>${escapeHtml(exam.promotion)}</td></tr><tr><td><strong>Date</strong></td><td>${formatDate(exam.date)}</td></tr><tr><td><strong>Horaire</strong></td><td>${startLabel}–${endLabel}</td></tr><tr><td><strong>Lieu</strong></td><td>${escapeHtml(exam.location)}</td></tr></table><p>Une invitation calendrier est jointe.</p><p>Bien cordialement,<br>La scolarité</p>`,
+    html: `<p>Bonjour ${escapeHtml(teacher.name)},</p><p>Vous êtes convoqué(e) pour une surveillance d'examen.</p><table><tr><td><strong>Examen</strong></td><td>${escapeHtml(exam.title)}</td></tr><tr><td><strong>Promotion</strong></td><td>${escapeHtml(exam.promotion)}</td></tr><tr><td><strong>Date</strong></td><td>${formatDate(exam.date)}</td></tr><tr><td><strong>Horaire</strong></td><td>${startLabel}–${endLabel}</td></tr><tr><td><strong>Lieu</strong></td><td>${escapeHtml(exam.location)}</td></tr></table><p>Une invitation calendrier est jointe.</p><p><a href="${acknowledgementLink}">Confirmer la prise de connaissance</a></p><p>Bien cordialement,<br>La scolarité</p>`,
     icalEvent: { filename: "convocation.ics", method: "REQUEST", content: ics }
   });
 }
