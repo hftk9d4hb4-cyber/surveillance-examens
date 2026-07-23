@@ -74,20 +74,23 @@ export async function POST(request: Request) {
   let failed = 0;
   for (const assignment of assignments) {
     try {
-      const result = await sendConvocationMail(assignment.exam, assignment.user);
+      const result = await sendConvocationMail(assignment.exam, assignment.user, assignment.id);
       const sentAt = new Date();
-      await prisma.convocation.upsert({
-        where: { assignmentId: assignment.id },
-        update: { status: "SENT", sentAt, lastError: null, messageId: result.messageId },
-        create: {
-          assignmentId: assignment.id,
-          examId: assignment.examId,
-          userId: assignment.userId,
-          status: "SENT",
-          sentAt,
-          messageId: result.messageId
-        }
-      });
+      await prisma.$transaction([
+        prisma.convocation.upsert({
+          where: { assignmentId: assignment.id },
+          update: { status: "SENT", sentAt, lastError: null, messageId: result.messageId },
+          create: {
+            assignmentId: assignment.id,
+            examId: assignment.examId,
+            userId: assignment.userId,
+            status: "SENT",
+            sentAt,
+            messageId: result.messageId
+          }
+        }),
+        prisma.assignmentAcknowledgement.deleteMany({ where: { assignmentId: assignment.id } })
+      ]);
       sent += 1;
     } catch (error) {
       const lastError = error instanceof Error ? error.message.slice(0, 500) : "Erreur inconnue";

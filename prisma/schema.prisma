@@ -110,6 +110,7 @@ model User {
   assignments      Assignment[]
   convocations     Convocation[]
   activationTokens ActivationToken[]
+  acknowledgements AssignmentAcknowledgement[]
   campaignsManaged Campaign[] @relation("CampaignManager")
   alertsResolved   CampaignAlert[] @relation("CampaignAlertResolver")
   importLogs       ImportLog[]        @relation("ImportCreator")
@@ -212,9 +213,22 @@ model Assignment {
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
   convocation  Convocation?
+  acknowledgement AssignmentAcknowledgement?
 
   @@unique([examId, userId])
   @@index([userId, createdAt])
+}
+
+model AssignmentAcknowledgement {
+  id             String     @id @default(cuid())
+  assignmentId   String     @unique
+  assignment     Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  acknowledgedAt DateTime   @default(now())
+  createdAt      DateTime   @default(now())
+
+  @@index([userId, acknowledgedAt])
 }
 
 model Convocation {
