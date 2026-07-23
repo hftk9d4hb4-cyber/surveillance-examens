@@ -5,10 +5,13 @@ import { redirect } from "next/navigation";
 import { writeAudit } from "@/lib/audit";
 import { canAccessCampaign } from "@/lib/campaign-access";
 import { requireStaff } from "@/lib/guards";
-import { sendActivationMail, sendAvailabilityReminderMail } from "@/lib/mail";
+import {
+  sendActivationMail,
+  sendAvailabilityReminderMail,
+  sendReminderEscalationMail
+} from "@/lib/mail";
 import { prisma } from "@/lib/prisma";
 import {
-  REMINDER_BATCH_LIMIT,
   reminderCooldownStart,
   reminderKindFor
 } from "@/lib/reminder-policy";
@@ -31,56 +34,44 @@ export async function sendCampaignReminders(formData: FormData) {
   if (!dashboard) redirect("/campaigns?error=not-found");
   if (!canAccessCampaign(dashboard.campaign.managerId, actor)) redirect("/campaigns?error=access");
 
-  const singleUserId = String(formData.get("singleUserId") || "");
-  const requestedIds = singleUserId
-    ? [singleUserId]
-    : formData.getAll("userId").map(String).filter(Boolean);
-  const userIds = [...new Set(requestedIds)];
-  if (userIds.length === 0) redirect(remindersUrl(campaignId, { error: "selection" }));
-  if (userIds.length > REMINDER_BATCH_LIMIT) redirect(remindersUrl(campaignId, { error: "limit" }));
+  const userId = String(formData.get("singleUserId") || "");
+  if (!userId) redirect(remindersUrl(campaignId, { error: "selection" }));
 
   const rowsById = new Map(dashboard.rows.map((row) => [row.id, row]));
-  const users = await prisma.user.findMany({
-    where: { id: { in: userIds }, role: "TEACHER", isActive: true }
+  const user = await prisma.user.findFirst({
+    where: { id: userId, role: "TEACHER", isActive: true }
   });
-  const usersById = new Map(users.map((user) => [user.id, user]));
-  const recentReminders = await prisma.auditLog.findMany({
+  const recentReminder = await prisma.auditLog.findFirst({
     where: {
       action: CAMPAIGN_REMINDER_AUDIT_ACTION,
       entity: "User",
-      entityId: { in: userIds },
+      entityId: userId,
       createdAt: { gte: reminderCooldownStart() },
       details: { path: ["campaignId"], equals: campaignId }
     },
-    select: { entityId: true }
+    select: { id: true }
   });
-  const coolingDown = new Set(recentReminders.map((event) => event.entityId).filter(Boolean));
 
   let sent = 0;
   let failed = 0;
   let skipped = 0;
-
-  for (const userId of userIds) {
-    const row = rowsById.get(userId);
-    const user = usersById.get(userId);
-    const kind = row ? reminderKindFor(row, dashboard.campaign.status) : null;
-    if (!row || !user || !kind || coolingDown.has(userId)) {
-      await writeAudit({
-        actorId: actor.id,
-        action: "CAMPAIGN_REMINDER_SKIPPED",
-        entity: "User",
-        entityId: userId,
-        details: {
-          campaignId,
-          kind: kind ?? "NONE",
-          result: "SKIPPED",
-          reason: coolingDown.has(userId) ? "COOLDOWN" : "NOT_ELIGIBLE"
-        }
-      });
-      skipped += 1;
-      continue;
-    }
-
+  const row = rowsById.get(userId);
+  const kind = row ? reminderKindFor(row, dashboard.campaign.status) : null;
+  if (!row || !user || !kind || recentReminder) {
+    await writeAudit({
+      actorId: actor.id,
+      action: "CAMPAIGN_REMINDER_SKIPPED",
+      entity: "User",
+      entityId: userId,
+      details: {
+        campaignId,
+        kind: kind ?? "NONE",
+        result: "SKIPPED",
+        reason: recentReminder ? "J7_WAIT" : "NOT_ELIGIBLE"
+      }
+    });
+    skipped = 1;
+  } else {
     try {
       if (kind === "ACTIVATION") {
         const { token } = await createActivationToken(user.id);
@@ -97,7 +88,46 @@ export async function sendCampaignReminders(formData: FormData) {
         entityId: user.id,
         details: { campaignId, kind, result: "SENT" }
       });
-      sent += 1;
+      sent = 1;
+
+      const reminderCount = await prisma.auditLog.count({
+        where: {
+          action: CAMPAIGN_REMINDER_AUDIT_ACTION,
+          entity: "User",
+          entityId: user.id,
+          details: { path: ["campaignId"], equals: campaignId }
+        }
+      });
+      if (reminderCount === 2 && dashboard.campaign.managerId) {
+        const manager = await prisma.user.findFirst({
+          where: { id: dashboard.campaign.managerId, isActive: true }
+        });
+        if (manager) {
+          try {
+            await sendReminderEscalationMail(manager, user, dashboard.campaign, reminderCount);
+            await writeAudit({
+              actorId: actor.id,
+              action: "CAMPAIGN_REMINDER_ESCALATION_SENT",
+              entity: "Campaign",
+              entityId: campaignId,
+              details: { teacherId: user.id, managerId: manager.id, reminderCount }
+            });
+          } catch (error) {
+            await writeAudit({
+              actorId: actor.id,
+              action: "CAMPAIGN_REMINDER_ESCALATION_FAILED",
+              entity: "Campaign",
+              entityId: campaignId,
+              details: {
+                teacherId: user.id,
+                managerId: manager.id,
+                reminderCount,
+                errorType: error instanceof Error ? error.name : "UnknownError"
+              }
+            });
+          }
+        }
+      }
     } catch (error) {
       await writeAudit({
         actorId: actor.id,
@@ -111,17 +141,9 @@ export async function sendCampaignReminders(formData: FormData) {
           errorType: error instanceof Error ? error.name : "UnknownError"
         }
       });
-      failed += 1;
+      failed = 1;
     }
   }
-
-  await writeAudit({
-    actorId: actor.id,
-    action: "CAMPAIGN_REMINDER_BATCH_COMPLETED",
-    entity: "Campaign",
-    entityId: campaignId,
-    details: { requested: userIds.length, sent, failed, skipped, mode: singleUserId ? "SINGLE" : "SELECTION" }
-  });
 
   revalidatePath(`/campaigns/${campaignId}/reminders`);
   redirect(remindersUrl(campaignId, { sent, failed, skipped }));

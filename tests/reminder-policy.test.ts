@@ -1,8 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  REMINDER_BATCH_LIMIT,
   REMINDER_COOLDOWN_MS,
+  canSendReminderAt,
+  nextReminderAt,
   reminderCooldownStart,
   reminderKindFor
 } from "../lib/reminder-policy";
@@ -53,8 +54,12 @@ test("inactive, complete and closed records cannot be reminded", () => {
   }, "CLOSED"), null);
 });
 
-test("the resend cooldown and batch limit remain bounded", () => {
+test("a second reminder is only allowed from J+7", () => {
   const now = new Date("2026-07-23T12:00:00.000Z");
-  assert.equal(reminderCooldownStart(now).toISOString(), new Date(now.getTime() - REMINDER_COOLDOWN_MS).toISOString());
-  assert.equal(REMINDER_BATCH_LIMIT, 50);
+  const lastReminder = new Date("2026-07-16T12:00:01.000Z");
+  assert.equal(REMINDER_COOLDOWN_MS, 7 * 24 * 60 * 60 * 1000);
+  assert.equal(reminderCooldownStart(now).toISOString(), "2026-07-16T12:00:00.000Z");
+  assert.equal(nextReminderAt(lastReminder).toISOString(), "2026-07-23T12:00:01.000Z");
+  assert.equal(canSendReminderAt(lastReminder, now), false);
+  assert.equal(canSendReminderAt(lastReminder, new Date("2026-07-23T12:00:01.000Z")), true);
 });

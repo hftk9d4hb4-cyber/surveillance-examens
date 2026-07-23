@@ -3,8 +3,7 @@ import type { ReminderTeacherRow } from "@/lib/reminders-dashboard-core";
 export type CampaignReminderKind = "ACTIVATION" | "AVAILABILITY";
 export type ReminderCampaignStatus = "PREPARATION" | "COLLECTING" | "ASSIGNING" | "PUBLISHED" | "CLOSED";
 
-export const REMINDER_BATCH_LIMIT = 50;
-export const REMINDER_COOLDOWN_MS = 5 * 60 * 1000;
+export const REMINDER_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 
 export function reminderKindFor(
   row: Pick<ReminderTeacherRow, "activationStatus" | "availabilityProgress" | "overallStatus">,
@@ -25,4 +24,12 @@ export function reminderKindFor(
 
 export function reminderCooldownStart(now = new Date()) {
   return new Date(now.getTime() - REMINDER_COOLDOWN_MS);
+}
+
+export function nextReminderAt(lastReminderAt: Date) {
+  return new Date(lastReminderAt.getTime() + REMINDER_COOLDOWN_MS);
+}
+
+export function canSendReminderAt(lastReminderAt: Date | null, now = new Date()) {
+  return !lastReminderAt || nextReminderAt(lastReminderAt) <= now;
 }

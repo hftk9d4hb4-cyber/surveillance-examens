@@ -80,6 +80,28 @@ La scolarité`,
   });
 }
 
+export async function sendReminderEscalationMail(
+  manager: User,
+  teacher: User,
+  campaign: { name: string; promotion: string },
+  reminderCount: number
+) {
+  return createTransporter().sendMail({
+    from: process.env.MAIL_FROM || process.env.SMTP_USER,
+    to: manager.email,
+    subject: `Suivi requis — ${campaign.name}`,
+    text: `Bonjour ${manager.name},
+
+${teacher.name} (${teacher.email}) n’a pas finalisé l’action attendue pour la campagne ${campaign.name} — ${campaign.promotion}, malgré ${reminderCount} relances.
+
+Merci de vérifier sa situation.
+
+Bien cordialement,
+Surveillance des examens`,
+    html: `<p>Bonjour ${escapeHtml(manager.name)},</p><p><strong>${escapeHtml(teacher.name)}</strong> (${escapeHtml(teacher.email)}) n’a pas finalisé l’action attendue pour la campagne <strong>${escapeHtml(campaign.name)}</strong> — ${escapeHtml(campaign.promotion)}, malgré ${reminderCount} relances.</p><p>Merci de vérifier sa situation.</p><p>Bien cordialement,<br>Surveillance des examens</p>`
+  });
+}
+
 export async function sendConvocationMail(exam: Exam, teacher: User) {
   const { start, end } = examStartEnd(exam);
   const ics = generateConvocationIcs(exam, teacher);

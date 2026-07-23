@@ -8,15 +8,16 @@ résultat.
 
 ## Périmètre livré
 
-- relance individuelle depuis chaque ligne éligible ;
-- relance groupée sur une sélection de 1 à 50 enseignants ;
+- relance uniquement individuelle depuis chaque ligne éligible ;
 - confirmation explicite avant chaque envoi ;
 - nouveau lien d’activation valable sept jours pour un compte non activé ;
 - courriel de demande de disponibilités pour un compte activé dont la réponse est
   absente ou incomplète ;
 - relance de disponibilités limitée aux campagnes en collecte ou en affectation ;
 - exclusion des comptes inactifs, dossiers complets et campagnes clôturées ;
-- protection de cinq minutes contre un renvoi accidentel au même enseignant ;
+- message standardisé et envoi immédiat après confirmation ;
+- nouvelle relance autorisée uniquement à J+7 ;
+- information de la gestionnaire de campagne après la deuxième relance ;
 - résultat récapitulatif après traitement : envoyées, échecs et ignorées ;
 - audit par enseignant et par lot, associé à la campagne et à l’acteur ;
 - historique visible des 100 dernières tentatives dans le tableau de campagne.
@@ -35,7 +36,8 @@ résultat.
 - `CAMPAIGN_REMINDER_SENT` ;
 - `CAMPAIGN_REMINDER_FAILED` ;
 - `CAMPAIGN_REMINDER_SKIPPED` ;
-- `CAMPAIGN_REMINDER_BATCH_COMPLETED`.
+- `CAMPAIGN_REMINDER_ESCALATION_SENT` ;
+- `CAMPAIGN_REMINDER_ESCALATION_FAILED`.
 
 Chaque événement individuel contient l’identifiant de campagne, le type de
 relance et le résultat. Les relances envoyées alimentent automatiquement la date

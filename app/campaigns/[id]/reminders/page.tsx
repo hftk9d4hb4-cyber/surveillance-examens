@@ -6,7 +6,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { canAccessCampaign } from "@/lib/campaign-access";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { requireStaff } from "@/lib/guards";
-import { reminderKindFor } from "@/lib/reminder-policy";
+import { canSendReminderAt, nextReminderAt, reminderKindFor } from "@/lib/reminder-policy";
 import {
   filterReminderRows,
   type ActivationStatus,
@@ -132,8 +132,7 @@ export default async function CampaignRemindersPage({
     {(sent > 0 || failed > 0 || skipped > 0) && <Notice type={failed > 0 ? "error" : "success"}>
       Relances traitées : {sent} envoyée{sent > 1 ? "s" : ""}, {failed} échec{failed > 1 ? "s" : ""}, {skipped} ignorée{skipped > 1 ? "s" : ""}.
     </Notice>}
-    {error === "selection" && <Notice type="error">Sélectionnez au moins un enseignant à relancer.</Notice>}
-    {error === "limit" && <Notice type="error">Une sélection est limitée à 50 enseignants.</Notice>}
+    {error === "selection" && <Notice type="error">La relance individuelle n’a pas pu être identifiée.</Notice>}
 
     <section className="reminders-summary" aria-label="Synthèse des réponses">
       <article><strong>{dashboard.rows.length}</strong><span>enseignants</span></article>
@@ -177,21 +176,13 @@ export default async function CampaignRemindersPage({
       </div>
     </form>
 
-    <form action={sendCampaignReminders} className="card reminders-results">
-      <input type="hidden" name="campaignId" value={id} />
+    <div className="card reminders-results">
       <div className="section-heading">
         <div><h2>Enseignants à suivre</h2><p className="muted">{rows.length} résultat{rows.length > 1 ? "s" : ""} après filtrage</p></div>
-        <ConfirmSubmitButton
-          confirmation="Envoyer une relance à tous les enseignants sélectionnés ?"
-          type="submit"
-        >
-          Relancer la sélection
-        </ConfirmSubmitButton>
       </div>
       <div className="table-wrap">
         <table className="reminders-table">
           <thead><tr>
-            <th><span className="sr-only">Sélection</span></th>
             <th>Enseignant</th>
             <th>Activation</th>
             <th>Disponibilités</th>
@@ -203,28 +194,31 @@ export default async function CampaignRemindersPage({
           <tbody>
             {rows.map((row) => {
               const reminderKind = reminderKindFor(row, dashboard.campaign.status);
+              const canSend = Boolean(reminderKind && canSendReminderAt(row.lastReminderAt));
               return <tr key={row.id}>
-              <td data-label="Sélection">{reminderKind ? <input type="checkbox" name="userId" value={row.id} aria-label={`Sélectionner ${row.name}`} /> : "—"}</td>
               <td data-label="Enseignant"><strong>{row.name}</strong><br /><span className="muted">{row.email}</span></td>
               <td data-label="Activation">{activationLabels[row.activationStatus]}</td>
               <td data-label="Disponibilités">{availabilityLabels[row.availabilityProgress]}<br /><span className="muted">{row.answeredSlots}/{row.expectedSlots} créneaux</span></td>
               <td data-label="Dernière connexion">{formatDateTime(row.lastLoginAt)}</td>
               <td data-label="Relances"><strong>{row.reminderCount}</strong><br /><span className="muted">{row.lastReminderAt ? formatDateTime(row.lastReminderAt) : "Aucune relance"}</span></td>
               <td data-label="Statut global"><StatusBadge label={statusLabels[row.overallStatus]} tone={statusTones[row.overallStatus]} /></td>
-              <td data-label="Action requise">{row.requiredAction}{reminderKind && <><br /><ConfirmSubmitButton
-                className="small secondary"
-                confirmation={`Envoyer une relance à ${row.name} ?`}
-                name="singleUserId"
-                value={row.id}
-                type="submit"
-              >Relancer</ConfirmSubmitButton></>}</td>
+              <td data-label="Action requise">{row.requiredAction}{canSend && <form action={sendCampaignReminders}>
+                <input type="hidden" name="campaignId" value={id} />
+                <ConfirmSubmitButton
+                  className="small secondary"
+                  confirmation={`Envoyer maintenant la relance standard à ${row.name} ?`}
+                  name="singleUserId"
+                  value={row.id}
+                  type="submit"
+                >Relancer</ConfirmSubmitButton>
+              </form>}{reminderKind && !canSend && row.lastReminderAt && <><br /><span className="muted">Prochaine relance possible le {formatDateTime(nextReminderAt(row.lastReminderAt))}</span></>}</td>
             </tr>;
             })}
-            {rows.length === 0 && <tr><td colSpan={8} className="empty">Aucun enseignant ne correspond aux filtres sélectionnés.</td></tr>}
+            {rows.length === 0 && <tr><td colSpan={7} className="empty">Aucun enseignant ne correspond aux filtres sélectionnés.</td></tr>}
           </tbody>
         </table>
       </div>
-    </form>
+    </div>
 
     <section className="card reminders-history">
       <div className="section-heading">
