@@ -5,7 +5,7 @@ Application métier de la Faculté de médecine destinée à organiser les surve
 ## Statut de cette branche
 
 - Branche de développement : `feature/v1.2-mp01-stabilisation`
-- Version applicative : `1.2.0-beta.2`
+- Version applicative : `1.2.0-rc.1`
 
 Cette version est une bêta de travail. Elle ne doit pas être fusionnée dans `main` avant validation complète du déploiement Vercel et de la recette fonctionnelle.
 

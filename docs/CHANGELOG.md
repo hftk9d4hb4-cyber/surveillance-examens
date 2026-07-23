@@ -1,3 +1,14 @@
+# 1.2.0-rc.1
+
+- stabilisation technique et sécuritaire de la base V1.2 ;
+- tableau consolidé des réponses et relances par campagne ;
+- relances individuelles à J+7 et signalement au gestionnaire après deux relances ;
+- confirmation personnelle de prise de connaissance des convocations ;
+- annulation, correction et remplacement sécurisés après notification ;
+- export opérationnel complet du pilotage de campagne ;
+- socle visuel responsive, navigation et formulaires adaptés aux écrans mobiles ;
+- cahier de recette et manifeste de release candidate.
+
 # 1.2.0-beta.1-4a
 
 - centre de pilotage de campagne ;
