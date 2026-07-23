@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireStaff } from "@/lib/guards";
 import { formatDate, formatDateTime, halfDayLabel } from "@/lib/format";
@@ -26,7 +27,7 @@ export default async function ConvocationsPage({ searchParams }: { searchParams:
   const pendingAcknowledgements = exams.flatMap((exam) => exam.assignments).filter((assignment) => assignment.convocation?.status === "SENT" && !assignment.acknowledgement).length;
   return (
     <main className="container">
-      <div className="page-header"><div><h1>Convocations</h1><p className="muted">Envois Gmail par lots de 25 avec invitation calendrier. Répétez l'opération jusqu'à ce que le compteur atteigne zéro.</p></div><div className="actions"><StatusBadge label={`${pending} à envoyer`} tone={pending ? "amber" : "green"} /><StatusBadge label={`${pendingAcknowledgements} confirmation${pendingAcknowledgements > 1 ? "s" : ""} attendue${pendingAcknowledgements > 1 ? "s" : ""}`} tone={pendingAcknowledgements ? "amber" : "green"} /></div></div>
+      <div className="page-header"><div><h1>Convocations</h1><p className="muted">Envois Gmail par lots de 25 avec invitation calendrier. Répétez l'opération jusqu'à ce que le compteur atteigne zéro.</p></div><div className="actions"><Link className="button secondary" href="/convocations/changes">Modifier après envoi</Link><StatusBadge label={`${pending} à envoyer`} tone={pending ? "amber" : "green"} /><StatusBadge label={`${pendingAcknowledgements} confirmation${pendingAcknowledgements > 1 ? "s" : ""} attendue${pendingAcknowledgements > 1 ? "s" : ""}`} tone={pendingAcknowledgements ? "amber" : "green"} /></div></div>
       {params.sent !== undefined && (
         <Notice type={Number(params.failed || 0) ? "warning" : "success"}>
           {params.sent} envoyée(s), {params.failed} erreur(s).
