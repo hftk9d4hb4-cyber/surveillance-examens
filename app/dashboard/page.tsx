@@ -112,7 +112,7 @@ export default async function DashboardPage({
     (sum, exam) => sum + Math.min(exam.assignments.length, exam.requiredSupervisors),
     0
   );
-  const coverage = required ? Math.round((covered / required) * 100) : 100;
+  const coverage = required ? Math.round((covered / required) * 100) : 0;
 
   return (
     <main className="container">
