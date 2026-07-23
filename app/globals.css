@@ -1,1 +1,131 @@
+/* MP-02 — tableau des relances */
+.reminders-page {
+  padding-bottom: 3rem;
+}
 
+.reminders-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.reminders-summary article {
+  border: 1px solid #d9e2ec;
+  border-radius: 0.75rem;
+  padding: 1rem;
+  background: #fff;
+}
+
+.reminders-summary strong,
+.reminders-summary span {
+  display: block;
+}
+
+.reminders-summary strong {
+  color: #12355b;
+  font-size: 1.75rem;
+}
+
+.reminders-summary span {
+  color: #52667a;
+  margin-top: 0.25rem;
+}
+
+.reminders-filters {
+  align-items: end;
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: minmax(12rem, 2fr) repeat(3, minmax(9rem, 1fr));
+  margin-bottom: 1rem;
+}
+
+.reminders-filters .field label,
+.reminders-filters .field input,
+.reminders-filters .field select {
+  display: block;
+  width: 100%;
+}
+
+.reminders-filters .field label {
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+
+.reminders-filters input,
+.reminders-filters select {
+  box-sizing: border-box;
+  min-height: 2.75rem;
+}
+
+.reminders-scope,
+.reminders-filters .actions {
+  align-items: center;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.reminders-results {
+  overflow: hidden;
+}
+
+.reminders-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.reminders-table th,
+.reminders-table td {
+  border-bottom: 1px solid #e6edf3;
+  padding: 0.8rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.reminders-table th {
+  color: #334e68;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 1024px) {
+  .reminders-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .reminders-table thead {
+    display: none;
+  }
+
+  .reminders-table,
+  .reminders-table tbody,
+  .reminders-table tr,
+  .reminders-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .reminders-table tr {
+    border-bottom: 2px solid #cbd5e1;
+    padding: 0.55rem 0;
+  }
+
+  .reminders-table td {
+    box-sizing: border-box;
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: minmax(8rem, 32%) 1fr;
+  }
+
+  .reminders-table td::before {
+    color: #52667a;
+    content: attr(data-label);
+    font-weight: 600;
+  }
+}
+
+@media (max-width: 640px) {
+  .reminders-summary,
+  .reminders-filters {
+    grid-template-columns: 1fr;
+  }
+}

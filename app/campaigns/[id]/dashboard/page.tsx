@@ -49,7 +49,7 @@ export default async function CampaignDashboardPage({ params, searchParams }: { 
   return <main className="container">
     <div className="page-header">
       <div><p className="eyebrow">Centre de pilotage</p><h1>{campaignDetails.name}</h1><p className="muted">{campaignDetails.promotion} · {campaignDetails.academicYear} · {formatDate(campaignDetails.startDate)} au {formatDate(campaignDetails.endDate)}</p></div>
-      <div className="actions"><Link className="button secondary" href="/campaigns">Retour aux campagnes</Link><form action={refreshCampaignAlerts}><input type="hidden" name="campaignId" value={id} /><button>Actualiser les alertes</button></form></div>
+      <div className="actions"><Link className="button secondary" href="/campaigns">Retour aux campagnes</Link><Link className="button secondary" href={`/campaigns/${id}/reminders`}>Suivre les relances</Link><form action={refreshCampaignAlerts}><input type="hidden" name="campaignId" value={id} /><button>Actualiser les alertes</button></form></div>
     </div>
     {query.refreshed === "1" && <Notice type="success">Les indicateurs et alertes ont été recalculés.</Notice>}
 
