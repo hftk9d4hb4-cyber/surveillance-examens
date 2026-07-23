@@ -1,10 +1,13 @@
-Surveillance des examens — V1.2.0 bêta
+# Surveillance des examens — V1.2.0 bêta
 
 Application métier de la Faculté de médecine destinée à organiser les surveillances d’examens : campagnes, enseignants, examens, disponibilités, affectations, convocations, imports, exports et suivi opérationnel.
 
-Statut de cette branche
+## Statut de cette branche
 
-Branche de développement : feature/v1.2-dashboard-relancesVersion applicative : 1.2.0-beta.1-4bCette version est une bêta de travail. Elle ne doit pas être fusionnée dans main avant validation complète du déploiement Vercel et de la recette fonctionnelle.
+- Branche de développement : `feature/v1.2-mp01-stabilisation`
+- Version applicative : `1.2.0-beta.2`
+
+Cette version est une bêta de travail. Elle ne doit pas être fusionnée dans `main` avant validation complète du déploiement Vercel et de la recette fonctionnelle.
 
 Fonctionnalités principales
 
