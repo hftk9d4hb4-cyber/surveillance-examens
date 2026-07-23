@@ -58,6 +58,12 @@ Dans **Affectations**, cliquer sur **Exporter Excel**. Le classeur contient :
 - la charge par enseignant ;
 - l’état des convocations.
 
+Pour un export complet limité à une campagne, ouvrir son **Centre de pilotage**
+puis cliquer sur **Exporter le pilotage**. Le classeur ajoute une synthèse des
+indicateurs, les postes manquants, les réponses de disponibilité, les alertes,
+les confirmations de prise de connaissance et les modifications réalisées
+après convocation.
+
 ## 8. Messages d’erreur fréquents
 
 - **Quota atteint** : augmenter le quota ou choisir un autre enseignant.
