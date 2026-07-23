@@ -112,6 +112,7 @@ model User {
   activationTokens ActivationToken[]
   acknowledgements AssignmentAcknowledgement[]
   campaignsManaged Campaign[] @relation("CampaignManager")
+  postNotificationChanges PostNotificationChange[] @relation("PostNotificationChangeRequester")
   alertsResolved   CampaignAlert[] @relation("CampaignAlertResolver")
   importLogs       ImportLog[]        @relation("ImportCreator")
   auditLogs        AuditLog[]         @relation("AuditActor")
@@ -174,6 +175,7 @@ model Exam {
   notes               String?
   campaignId          String?
   campaign            Campaign?     @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  postNotificationChanges PostNotificationChange[]
   assignments         Assignment[]
   convocations        Convocation[]
   createdAt           DateTime      @default(now())
@@ -183,6 +185,29 @@ model Exam {
   @@index([academicYear, date, halfDay])
   @@index([status, date])
   @@index([campaignId, date])
+}
+
+model PostNotificationChange {
+  id                 String   @id @default(cuid())
+  examId             String
+  exam               Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  requestedById      String?
+  requestedBy        User?    @relation("PostNotificationChangeRequester", fields: [requestedById], references: [id], onDelete: SetNull)
+  type               String
+  status             String   @default("PREVIEW")
+  reason             String
+  payload            Json
+  snapshot           Json
+  affectedUserIds    Json
+  consequences       Json
+  notificationErrors Int      @default(0)
+  appliedAt          DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([examId, createdAt])
+  @@index([status, createdAt])
+  @@index([requestedById, createdAt])
 }
 
 model Availability {

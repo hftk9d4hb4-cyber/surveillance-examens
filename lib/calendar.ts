@@ -44,14 +44,14 @@ export function examStartEnd(exam: Pick<Exam, "date" | "startTime" | "endTime" |
   };
 }
 
-export function generateConvocationIcs(exam: Exam, teacher: User) {
+function generateConvocationCalendar(exam: Exam, teacher: User, method: "REQUEST" | "CANCEL") {
   const { start, end } = examStartEnd(exam);
   return [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
     "PRODID:-//Faculte de Medecine de Nice//Surveillance Examens//FR",
     "CALSCALE:GREGORIAN",
-    "METHOD:REQUEST",
+    `METHOD:${method}`,
     "BEGIN:VEVENT",
     `UID:${exam.id}-${teacher.id}@surveillance-examens`,
     `DTSTAMP:${icsUtc(new Date())}`,
@@ -61,11 +61,19 @@ export function generateConvocationIcs(exam: Exam, teacher: User) {
     `LOCATION:${escapeIcs(exam.location)}`,
     `DESCRIPTION:${escapeIcs(`Promotion ${exam.promotion}${exam.notes ? `\n${exam.notes}` : ""}`)}`,
     `ATTENDEE;CN="${escapeParameter(teacher.name)}";ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:${teacher.email}`,
-    "STATUS:CONFIRMED",
+    `STATUS:${method === "CANCEL" ? "CANCELLED" : "CONFIRMED"}`,
     "TRANSP:OPAQUE",
-    `SEQUENCE:${calendarSequence(exam.updatedAt)}`,
+    `SEQUENCE:${calendarSequence(exam.updatedAt) + (method === "CANCEL" ? 1 : 0)}`,
     "END:VEVENT",
     "END:VCALENDAR",
     ""
   ].map(foldIcsLine).join("\r\n");
+}
+
+export function generateConvocationIcs(exam: Exam, teacher: User) {
+  return generateConvocationCalendar(exam, teacher, "REQUEST");
+}
+
+export function generateConvocationCancellationIcs(exam: Exam, teacher: User) {
+  return generateConvocationCalendar(exam, teacher, "CANCEL");
 }
