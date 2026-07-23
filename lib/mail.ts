@@ -45,6 +45,63 @@ Si vous n'êtes pas concerné(e), ignorez ce message.`,
   });
 }
 
+export async function sendAvailabilityReminderMail(
+  user: User,
+  campaign: {
+    name: string;
+    promotion: string;
+    startDate: Date;
+    endDate: Date;
+    responseDeadline: Date | null;
+  }
+) {
+  const link = `${baseUrl()}/availability`;
+  const deadline = campaign.responseDeadline
+    ? `Merci de répondre avant le ${formatDate(campaign.responseDeadline)}.`
+    : "Merci de renseigner vos disponibilités dès que possible.";
+  return createTransporter().sendMail({
+    from: process.env.MAIL_FROM || process.env.SMTP_USER,
+    to: user.email,
+    subject: `Disponibilités à compléter — ${campaign.name}`,
+    text: `Bonjour ${user.name},
+
+Vos disponibilités de surveillance sont absentes ou incomplètes pour la campagne suivante :
+
+Campagne : ${campaign.name}
+Promotion : ${campaign.promotion}
+Période : ${formatDate(campaign.startDate)} au ${formatDate(campaign.endDate)}
+
+${deadline}
+${link}
+
+Bien cordialement,
+La scolarité`,
+    html: `<p>Bonjour ${escapeHtml(user.name)},</p><p>Vos disponibilités de surveillance sont absentes ou incomplètes pour la campagne suivante :</p><ul><li><strong>Campagne :</strong> ${escapeHtml(campaign.name)}</li><li><strong>Promotion :</strong> ${escapeHtml(campaign.promotion)}</li><li><strong>Période :</strong> ${formatDate(campaign.startDate)} au ${formatDate(campaign.endDate)}</li></ul><p>${escapeHtml(deadline)}</p><p><a href="${link}">Renseigner mes disponibilités</a></p><p>Bien cordialement,<br>La scolarité</p>`
+  });
+}
+
+export async function sendReminderEscalationMail(
+  manager: User,
+  teacher: User,
+  campaign: { name: string; promotion: string },
+  reminderCount: number
+) {
+  return createTransporter().sendMail({
+    from: process.env.MAIL_FROM || process.env.SMTP_USER,
+    to: manager.email,
+    subject: `Suivi requis — ${campaign.name}`,
+    text: `Bonjour ${manager.name},
+
+${teacher.name} (${teacher.email}) n’a pas finalisé l’action attendue pour la campagne ${campaign.name} — ${campaign.promotion}, malgré ${reminderCount} relances.
+
+Merci de vérifier sa situation.
+
+Bien cordialement,
+Surveillance des examens`,
+    html: `<p>Bonjour ${escapeHtml(manager.name)},</p><p><strong>${escapeHtml(teacher.name)}</strong> (${escapeHtml(teacher.email)}) n’a pas finalisé l’action attendue pour la campagne <strong>${escapeHtml(campaign.name)}</strong> — ${escapeHtml(campaign.promotion)}, malgré ${reminderCount} relances.</p><p>Merci de vérifier sa situation.</p><p>Bien cordialement,<br>Surveillance des examens</p>`
+  });
+}
+
 export async function sendConvocationMail(exam: Exam, teacher: User) {
   const { start, end } = examStartEnd(exam);
   const ics = generateConvocationIcs(exam, teacher);

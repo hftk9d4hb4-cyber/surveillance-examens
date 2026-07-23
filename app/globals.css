@@ -69,6 +69,12 @@
   overflow: hidden;
 }
 
+.reminders-results .section-heading {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
 .reminders-table {
   border-collapse: collapse;
   width: 100%;
@@ -120,6 +126,12 @@
     color: #52667a;
     content: attr(data-label);
     font-weight: 600;
+  }
+
+  .reminders-results .section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.75rem;
   }
 }
 
