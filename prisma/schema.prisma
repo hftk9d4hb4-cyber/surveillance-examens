@@ -26,10 +26,27 @@ enum AvailabilityStatus {
   STRONG_AVAILABLE
 }
 
+enum AbsenceType {
+  VACATION
+  CONFERENCE
+  TRAINING
+  MISSION
+  PERSONAL
+  OTHER
+}
+
 enum ExamStatus {
   DRAFT
   PUBLISHED
   CANCELLED
+}
+
+enum CampaignStatus {
+  PREPARATION
+  COLLECTING
+  ASSIGNING
+  PUBLISHED
+  CLOSED
 }
 
 enum AssignmentSource {
@@ -41,6 +58,24 @@ enum ConvocationStatus {
   PENDING
   SENT
   ERROR
+}
+
+
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum AlertType {
+  MISSING_AVAILABILITY
+  UNDERSTAFFED_EXAM
+  DOUBLE_ASSIGNMENT
+  UNAVAILABLE_TEACHER
+  QUOTA_EXCEEDED
+  EXTRA_TIME_UNDERSTAFFED
+  DATA_QUALITY
 }
 
 enum ImportKind {
@@ -70,9 +105,15 @@ model User {
   activationSentAt DateTime?
   lastLoginAt      DateTime?
   availabilities   Availability[]
+  absencePeriods   TeacherAbsence[]
+  preferences      TeacherPreference[]
   assignments      Assignment[]
   convocations     Convocation[]
   activationTokens ActivationToken[]
+  acknowledgements AssignmentAcknowledgement[]
+  campaignsManaged Campaign[] @relation("CampaignManager")
+  postNotificationChanges PostNotificationChange[] @relation("PostNotificationChangeRequester")
+  alertsResolved   CampaignAlert[] @relation("CampaignAlertResolver")
   importLogs       ImportLog[]        @relation("ImportCreator")
   auditLogs        AuditLog[]         @relation("AuditActor")
   createdAt        DateTime           @default(now())
@@ -94,6 +135,29 @@ model ActivationToken {
   @@index([userId, expiresAt])
 }
 
+model Campaign {
+  id                  String         @id @default(cuid())
+  name                String
+  academicYear        String
+  promotion           String
+  startDate           DateTime       @db.Date
+  endDate             DateTime       @db.Date
+  responseDeadline    DateTime?      @db.Date
+  collectionStartedAt DateTime?
+  status              CampaignStatus @default(PREPARATION)
+  managerId           String?
+  manager             User?          @relation("CampaignManager", fields: [managerId], references: [id], onDelete: SetNull)
+  exams               Exam[]
+  alerts              CampaignAlert[]
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  @@unique([academicYear, promotion, name], name: "campaignNaturalKey")
+  @@index([academicYear, status])
+  @@index([managerId, status])
+  @@index([startDate, endDate])
+}
+
 model Exam {
   id                  String        @id @default(cuid())
   externalId          String?       @unique
@@ -109,6 +173,9 @@ model Exam {
   requiredSupervisors Int
   status              ExamStatus    @default(PUBLISHED)
   notes               String?
+  campaignId          String?
+  campaign            Campaign?     @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  postNotificationChanges PostNotificationChange[]
   assignments         Assignment[]
   convocations        Convocation[]
   createdAt           DateTime      @default(now())
@@ -117,6 +184,30 @@ model Exam {
   @@unique([date, halfDay, title, location], name: "examNaturalKey")
   @@index([academicYear, date, halfDay])
   @@index([status, date])
+  @@index([campaignId, date])
+}
+
+model PostNotificationChange {
+  id                 String   @id @default(cuid())
+  examId             String
+  exam               Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  requestedById      String?
+  requestedBy        User?    @relation("PostNotificationChangeRequester", fields: [requestedById], references: [id], onDelete: SetNull)
+  type               String
+  status             String   @default("PREVIEW")
+  reason             String
+  payload            Json
+  snapshot           Json
+  affectedUserIds    Json
+  consequences       Json
+  notificationErrors Int      @default(0)
+  appliedAt          DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([examId, createdAt])
+  @@index([status, createdAt])
+  @@index([requestedById, createdAt])
 }
 
 model Availability {
@@ -147,9 +238,22 @@ model Assignment {
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
   convocation  Convocation?
+  acknowledgement AssignmentAcknowledgement?
 
   @@unique([examId, userId])
   @@index([userId, createdAt])
+}
+
+model AssignmentAcknowledgement {
+  id             String     @id @default(cuid())
+  assignmentId   String     @unique
+  assignment     Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  acknowledgedAt DateTime   @default(now())
+  createdAt      DateTime   @default(now())
+
+  @@index([userId, acknowledgedAt])
 }
 
 model Convocation {
@@ -201,4 +305,91 @@ model AuditLog {
 
   @@index([entity, entityId])
   @@index([createdAt])
+}
+
+
+model TeacherAbsence {
+  id        String      @id @default(cuid())
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      AbsenceType
+  startDate DateTime    @db.Date
+  endDate   DateTime    @db.Date
+  comment   String?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([userId, startDate, endDate])
+  @@index([startDate, endDate])
+}
+
+model TeacherPreference {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weekday   Int
+  halfDay   HalfDay
+  weight    Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, weekday, halfDay])
+  @@index([weekday, halfDay, weight])
+}
+
+
+model AssignmentEngineConfig {
+  id                    String   @id @default(cuid())
+  academicYear          String   @unique
+  availabilityWeight    Int      @default(35)
+  quotaWeight           Int      @default(25)
+  fairnessWeight        Int      @default(20)
+  recencyWeight         Int      @default(10)
+  preferenceWeight      Int      @default(10)
+  extraTimeMultiplier   Float    @default(1.5)
+  maxAssignmentsPerDay  Int      @default(1)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([academicYear])
+}
+
+model AssignmentSimulation {
+  id             String   @id @default(cuid())
+  academicYear   String
+  createdById    String?
+  status         String   @default("PREVIEW")
+  parameters     Json
+  result         Json
+  anomalyCount   Int      @default(0)
+  assignmentCount Int     @default(0)
+  validatedAt    DateTime?
+  createdAt      DateTime @default(now())
+
+  @@index([academicYear, createdAt])
+  @@index([createdById, createdAt])
+}
+
+
+model CampaignAlert {
+  id            String        @id @default(cuid())
+  campaignId    String
+  campaign      Campaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  type          AlertType
+  severity      AlertSeverity
+  fingerprint   String
+  title         String
+  message       String
+  entityType    String?
+  entityId      String?
+  resolutionUrl String?
+  resolvedAt    DateTime?
+  resolvedById  String?
+  resolvedBy    User?         @relation("CampaignAlertResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@unique([campaignId, fingerprint])
+  @@index([campaignId, resolvedAt, severity])
+  @@index([type, createdAt])
 }

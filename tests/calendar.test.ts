@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { calendarSequence, examStartEnd, generateConvocationIcs } from "@/lib/calendar";
+import { calendarSequence, examStartEnd, generateConvocationCancellationIcs, generateConvocationIcs } from "@/lib/calendar";
 
 const exam = {
   id: "exam-1",
@@ -60,4 +60,11 @@ test("augmente la séquence calendrier quand l’examen est mis à jour", () => 
   const before = calendarSequence(new Date("2026-07-20T20:00:00.000Z"));
   const after = calendarSequence(new Date("2026-07-20T20:00:01.000Z"));
   assert.equal(after, before + 1);
+});
+
+test("génère une annulation calendrier avec une séquence supérieure", () => {
+  const ics = generateConvocationCancellationIcs(exam as never, teacher as never);
+  assert.match(ics, /METHOD:CANCEL/);
+  assert.match(ics, /STATUS:CANCELLED/);
+  assert.match(ics, new RegExp(`SEQUENCE:${calendarSequence(exam.updatedAt) + 1}`));
 });

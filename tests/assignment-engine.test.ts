@@ -111,3 +111,61 @@ test("reste déterministe quand l’ordre des enseignants et examens change", ()
   const second = planAssignments({ teachers: [...teachersInput].reverse(), exams: [...examsInput].reverse(), availabilityBySlot: availability, lockedAssignments: [] });
   assert.deepEqual(first, second);
 });
+
+test("exclut une absence même en présence d'une disponibilité forte", () => {
+  const plan = planAssignments({
+    teachers: teachers.slice(0, 2),
+    exams: [exams[0]],
+    availabilityBySlot: new Map([
+      ["a|2026-09-01|AM", "STRONG_AVAILABLE" as const],
+      ["b|2026-09-01|AM", "AVAILABLE" as const]
+    ]),
+    absenceSlots: new Set(["a|2026-09-01|AM"]),
+    lockedAssignments: []
+  });
+  assert.equal(plan.assignments[0].userId, "b");
+});
+
+test("une préférence positive départage deux profils comparables", () => {
+  const plan = planAssignments({
+    teachers: [
+      { id: "a", name: "Alice", quotaAnnual: 10, currentLoad: 0 },
+      { id: "b", name: "Benoît", quotaAnnual: 10, currentLoad: 0 }
+    ],
+    exams: [exams[0]],
+    availabilityBySlot: new Map([
+      ["a|2026-09-01|AM", "AVAILABLE" as const],
+      ["b|2026-09-01|AM", "AVAILABLE" as const]
+    ]),
+    preferenceBySlot: new Map([
+      ["a|2|AM", 1],
+      ["b|2|AM", -1]
+    ]),
+    lockedAssignments: []
+  });
+  assert.equal(plan.assignments[0].userId, "a");
+  assert.ok(plan.assignments[0].scoreDetails.preferencePoints > 0);
+});
+
+test("pondère un examen tiers-temps dans la charge finale", () => {
+  const plan = planAssignments({
+    teachers: [{ id: "a", name: "Alice", quotaAnnual: 10, currentLoad: 0 }],
+    exams: [{ ...exams[0], extraTime: true }],
+    availabilityBySlot: new Map([["a|2026-09-01|AM", "STRONG_AVAILABLE" as const]]),
+    lockedAssignments: [],
+    weights: { availability: 35, quota: 25, fairness: 20, recency: 10, preference: 10, extraTimeMultiplier: 1.5 }
+  });
+  assert.equal(plan.finalWeightedLoads.a, 1.5);
+  assert.equal(plan.assignments[0].scoreDetails.assignmentWeight, 1.5);
+});
+
+test("signale une anomalie de sous-effectif", () => {
+  const plan = planAssignments({
+    teachers: [],
+    exams: [exams[0]],
+    availabilityBySlot: new Map(),
+    lockedAssignments: []
+  });
+  assert.equal(plan.anomalies[0].type, "UNDERSTAFFED");
+  assert.equal(plan.anomalies[0].severity, "error");
+});

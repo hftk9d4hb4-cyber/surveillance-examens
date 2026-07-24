@@ -1,6 +1,6 @@
 {
   "name": "surveillance-examens",
-  "version": "1.1.0-rc.2",
+  "version": "1.2.0-rc.1",
   "private": true,
   "engines": {
     "node": "22.x"
@@ -11,7 +11,8 @@
     "vercel-build": "sh -c 'export DATABASE_URL=\"${DATABASE_URL:-$POSTGRES_PRISMA_URL}\"; export DATABASE_URL_UNPOOLED=\"${DATABASE_URL_UNPOOLED:-${POSTGRES_URL_NON_POOLING:-$POSTGRES_URL}}\"; prisma generate && prisma migrate deploy && next build'",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/**/*.test.ts",
+    "test": "node --import tsx --test tests/**/*.test.ts",
+    "check:hygiene": "node scripts/check-repository-hygiene.mjs",
     "db:validate": "prisma validate",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
@@ -19,7 +20,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "lint": "eslint .",
-    "check": "npm run lint && npm run typecheck && npm test"
+    "check": "npm run check:hygiene && npm run lint && npm run typecheck && npm test"
   },
   "dependencies": {
     "@prisma/client": "6.19.0",
