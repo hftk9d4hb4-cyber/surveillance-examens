@@ -149,17 +149,31 @@ export async function validateAssignmentSimulation(simulationId: string, actorId
   const examIds = exams.map((exam) => exam.id);
   await prisma.$transaction(async (tx) => {
     await tx.assignment.deleteMany({ where: { examId: { in: examIds }, locked: false } });
-    if (plan.assignments.length > 0) {
-      await tx.assignment.createMany({
-        data: plan.assignments.map((assignment) => ({
+    for (const assignment of plan.assignments) {
+      await tx.assignment.upsert({
+        where: { examId_userId: { examId: assignment.examId, userId: assignment.userId } },
+        update: {
+          score: assignment.score,
+          scoreDetails: assignment.scoreDetails as unknown as Prisma.InputJsonValue,
+          source: "AUTO",
+          locked: false
+        },
+        create: {
           examId: assignment.examId,
           userId: assignment.userId,
           score: assignment.score,
           scoreDetails: assignment.scoreDetails as unknown as Prisma.InputJsonValue,
           source: "AUTO",
           locked: false
-        }))
+        }
       });
+    }
+
+    const persistedCount = await tx.assignment.count({
+      where: { examId: { in: examIds }, locked: false, source: "AUTO" }
+    });
+    if (persistedCount !== plan.assignments.length) {
+      throw new Error("Les affectations n'ont pas toutes été enregistrées.");
     }
     await tx.assignmentSimulation.update({ where: { id: simulationId }, data: { status: "VALIDATED", validatedAt: new Date() } });
   });
