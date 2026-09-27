@@ -29,6 +29,19 @@ export default async function StatisticsPage({ searchParams }: {
     })
   ]);
   const stats = buildAnnualStatistics(exams, teachers);
+  const serviceOptions = [...new Set(stats.teacherRows.map((teacher) => teacher.department?.trim() || "Service non renseigné"))].sort((a, b) => a.localeCompare(b, "fr"));
+  const requestedDepartment = typeof params.department === "string" ? params.department : "";
+  const selectedDepartment = serviceOptions.includes(requestedDepartment) ? requestedDepartment : "";
+  const visibleTeacherRows = stats.teacherRows
+    .filter((teacher) => !selectedDepartment || (teacher.department?.trim() || "Service non renseigné") === selectedDepartment)
+    .sort((a, b) => {
+      const aOver = a.quotaAnnual !== null && a.assignmentCount > a.quotaAnnual;
+      const bOver = b.quotaAnnual !== null && b.assignmentCount > b.quotaAnnual;
+      if (aOver !== bOver) return aOver ? -1 : 1;
+      const aRatio = a.quotaAnnual && a.quotaAnnual > 0 ? a.assignmentCount / a.quotaAnnual : -1;
+      const bRatio = b.quotaAnnual && b.quotaAnnual > 0 ? b.assignmentCount / b.quotaAnnual : -1;
+      return bRatio - aRatio || a.name.localeCompare(b.name, "fr");
+    });
   return <main className="container">
     <div className="page-header">
       <div><h1>Statistiques annuelles</h1><p className="muted">Année universitaire {selectedYear} · examens publiés et affectations enregistrées</p></div>
@@ -39,6 +52,11 @@ export default async function StatisticsPage({ searchParams }: {
         <label htmlFor="statistics-year">Année universitaire</label>
         <select id="statistics-year" name="year" defaultValue={selectedYear}>
           {years.length ? years.map((year) => <option key={year} value={year}>{year}</option>) : <option value={selectedYear}>{selectedYear}</option>}
+        </select>
+        <label htmlFor="statistics-department">Service pour la charge</label>
+        <select id="statistics-department" name="department" defaultValue={selectedDepartment}>
+          <option value="">Tous les services</option>
+          {serviceOptions.map((department) => <option key={department} value={department}>{department}</option>)}
         </select>
         <button type="submit">Afficher</button>
       </form>
@@ -59,10 +77,29 @@ export default async function StatisticsPage({ searchParams }: {
     </section>
     <section className="card">
       <h2>Charge par enseignant</h2>
-      <p className="muted">Les points reprennent la pondération enregistrée pour les simulations (par exemple tiers-temps). Une affectation sans pondération enregistrée compte pour 1 point. Cet indicateur aide à comparer les charges ; il ne remplace pas l’examen des disponibilités et des contraintes.</p>
-      <div className="table-wrap"><table><thead><tr><th>Enseignant</th><th>Service</th><th>Affectations</th><th>Points de charge</th><th>Quota annuel</th><th>Écart au quota (affectations)</th></tr></thead><tbody>
-        {stats.teacherRows.map((teacher) => <tr key={teacher.id}><th scope="row">{teacher.name}</th><td>{teacher.department || "Service non renseigné"}</td><td>{teacher.assignmentCount}</td><td>{teacher.workloadPoints.toFixed(1)}</td><td>{teacher.quotaAnnual ?? "Non défini"}</td><td>{teacher.quotaAnnual === null ? "—" : teacher.quotaAnnual - teacher.assignmentCount}</td></tr>)}
-        {!stats.teacherRows.length && <tr><td colSpan={6} className="empty">Aucun enseignant actif.</td></tr>}
+      <p className="muted">Les points reprennent la pondération enregistrée pour les simulations (par exemple tiers-temps). Une affectation sans pondération enregistrée compte pour 1 point. Les lignes sont classées selon le quota annuel ; le filtre par service ne modifie pas les indicateurs annuels ni la répartition globale.</p>
+      <div className="table-wrap"><table><thead><tr><th>Enseignant</th><th>Service</th><th>Affectations</th><th>Points de charge</th><th>Quota annuel</th><th>Position par rapport au quota</th><th>Écart (affectations)</th></tr></thead><tbody>
+        {visibleTeacherRows.map((teacher) => {
+          const quotaGap = teacher.quotaAnnual === null ? null : teacher.quotaAnnual - teacher.assignmentCount;
+          const status = quotaGap === null ? "Quota non défini" : quotaGap < 0 ? "Au-dessus du quota" : quotaGap === 0 ? "Quota atteint" : "Sous le quota";
+          const statusColor = quotaGap === null ? "#52606d" : quotaGap < 0 ? "#b42318" : quotaGap === 0 ? "#9a6700" : "#18794e";
+          const progressMax = teacher.quotaAnnual !== null && teacher.quotaAnnual > 0 ? teacher.quotaAnnual : null;
+          const progressValue = progressMax === null ? 0 : Math.min(teacher.assignmentCount, progressMax);
+          const quotaPercent = progressMax === null ? null : Math.round((teacher.assignmentCount / progressMax) * 100);
+          return <tr key={teacher.id}>
+            <th scope="row">{teacher.name}</th>
+            <td>{teacher.department || "Service non renseigné"}</td>
+            <td>{teacher.assignmentCount}</td>
+            <td>{teacher.workloadPoints.toFixed(1)}</td>
+            <td>{teacher.quotaAnnual ?? "Non défini"}</td>
+            <td>
+              <div style={{ color: statusColor, fontWeight: 600 }}>{status}{quotaPercent !== null ? ` · ${quotaPercent}%` : ""}</div>
+              {progressMax !== null && <progress value={progressValue} max={progressMax} aria-label={`Quota de ${teacher.name} : ${teacher.assignmentCount} affectation(s) sur ${progressMax}`} />}
+            </td>
+            <td>{quotaGap === null ? "—" : quotaGap}</td>
+          </tr>;
+        })}
+        {!visibleTeacherRows.length && <tr><td colSpan={7} className="empty">Aucun enseignant actif pour ce service.</td></tr>}
       </tbody></table></div>
     </section>
   </main>;
