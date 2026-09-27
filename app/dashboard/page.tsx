@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { coverageSummary } from "@/lib/planning";
 import { prisma } from "@/lib/prisma";
 import { requireUser, hasStaffRole } from "@/lib/guards";
 import { formatDate, halfDayLabel } from "@/lib/format";
@@ -91,7 +92,7 @@ export default async function DashboardPage({
 
   if (!hasStaffRole(user.role)) return null;
   const isAdmin = user.role === "ADMIN";
-  const [teachers, exams, assignments, sent, pendingActivations, upcomingExams] = await Promise.all([
+  const [teachers, exams, assignments, sent, pendingActivations, upcomingExams, coverageExams] = await Promise.all([
     prisma.user.count({ where: { role: "TEACHER", isActive: true } }),
     prisma.exam.count({ where: { status: "PUBLISHED", date: { gte: today } } }),
     prisma.assignment.count({ where: { exam: { status: "PUBLISHED", date: { gte: today } } } }),
@@ -104,15 +105,14 @@ export default async function DashboardPage({
       include: { assignments: true },
       orderBy: [{ date: "asc" }, { halfDay: "asc" }],
       take: 12
+    }),
+    prisma.exam.findMany({
+      where: { status: "PUBLISHED", date: { gte: today } },
+      select: { requiredSupervisors: true, _count: { select: { assignments: true } } }
     })
   ]);
 
-  const required = upcomingExams.reduce((sum, exam) => sum + exam.requiredSupervisors, 0);
-  const covered = upcomingExams.reduce(
-    (sum, exam) => sum + Math.min(exam.assignments.length, exam.requiredSupervisors),
-    0
-  );
-  const coverage = required ? Math.round((covered / required) * 100) : 0;
+  const summary = coverageSummary(coverageExams);
 
   return (
     <main className="container">
@@ -122,7 +122,8 @@ export default async function DashboardPage({
           <p className="muted">Pilotage opérationnel des surveillances d’examens.</p>
         </div>
         <div className="actions">
-          <Link className="button" href="/admin/imports">Importer les données</Link>
+          <Link className="button" href="/planning">Voir le planning mensuel</Link>
+          <Link className="button secondary" href="/admin/imports">Importer les données</Link>
           <Link className="button secondary" href="/assignments">Gérer les affectations</Link>
         </div>
       </div>
@@ -131,7 +132,7 @@ export default async function DashboardPage({
         <div className="col-3"><StatCard value={teachers} label="enseignants actifs" /></div>
         <div className="col-3"><StatCard value={exams} label="examens à venir" /></div>
         <div className="col-3"><StatCard value={assignments} label="affectations à venir" /></div>
-        <div className="col-3"><StatCard value={`${coverage}%`} label="couverture des 12 prochains examens" /></div>
+        <div className="col-3"><StatCard value={summary.coverage === null ? "—" : `${summary.coverage}%`} label="couverture de tous les examens à venir" note={`${summary.required - summary.missing}/${summary.required} postes pourvus`} /></div>
       </div>
       <div className="grid">
         <div className="col-8">
@@ -158,6 +159,8 @@ export default async function DashboardPage({
         <div className="col-4">
           <div className="card">
             <h2>À traiter</h2>
+            <p><strong>{summary.missing}</strong> poste(s) à pourvoir sur <strong>{summary.incomplete}</strong> examen(s) à venir.</p>
+            <p><Link href="/assignments">Compléter les affectations</Link></p>
             {isAdmin && <p><strong>{pendingActivations}</strong> compte(s) enseignant en attente d’activation.</p>}
             <p><strong>{Math.max(0, assignments - sent)}</strong> convocation(s) potentiellement à envoyer.</p>
             <div className="actions">
