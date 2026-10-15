@@ -111,8 +111,6 @@ export default async function ImportsPage({
 
       {isAdmin && <StaffImportForm />}
 
-      {isAdmin && <StaffImportForm />}
-
       {isAdmin && (
         <div className="card">
           <div className="page-header">
@@ -134,15 +132,6 @@ export default async function ImportsPage({
         </div>
       )}
 
-      {isAdmin && <div className="card">
-        <h2>Activation des agents de scolarité</h2>
-        <p>{staffPending} gestionnaire(s) en attente d’activation ; {staffNeverSent} n’ont jamais reçu de lien.</p>
-        {staffNeverSent > 0 && <form action="/api/users/send-activations" method="post">
-          <input type="hidden" name="targetRole" value="MANAGER" />
-          <button>Envoyer les {Math.min(20, staffNeverSent)} prochains liens MANAGER</button>
-        </form>}
-        <p>Les renvois individuels sont disponibles dans Administration.</p>
-      </div>}
       {isAdmin && <div className="card">
         <h2>Activation des agents de scolarité</h2>
         <p>{staffPending} gestionnaire(s) en attente d’activation ; {staffNeverSent} n’ont jamais reçu de lien.</p>
