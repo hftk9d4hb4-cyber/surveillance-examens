@@ -11,12 +11,13 @@ export async function POST(request: Request) {
   const formData = await request.formData();
   const specificUserId = String(formData.get("userId") || "");
   const resend = formData.get("resend") === "true";
+  const targetRole = formData.get("targetRole") === "MANAGER" ? "MANAGER" : "TEACHER"; 
 
   const users = await prisma.user.findMany({
     where: specificUserId
-      ? { id: specificUserId, role: "TEACHER", isActive: true, mustChangePassword: true }
+      ? { id: specificUserId, role: targetRole, isActive: true, mustChangePassword: true }
       : {
-          role: "TEACHER",
+          role: targetRole,
           isActive: true,
           mustChangePassword: true,
           ...(resend ? {} : { activationSentAt: null })
@@ -41,7 +42,7 @@ export async function POST(request: Request) {
     actorId: actor.id,
     action: resend ? "ACTIVATIONS_RESENT" : "ACTIVATIONS_SENT",
     entity: "User",
-    details: { sent, failed, specificUserId: specificUserId || null }
+    details: { sent, failed, targetRole, specificUserId: specificUserId || null }
   });
   return NextResponse.redirect(new URL(`/admin/imports?activationSent=${sent}&activationFailed=${failed}`, request.url), 303);
 }

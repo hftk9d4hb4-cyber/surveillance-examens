@@ -28,6 +28,22 @@ Protections intégrées :
 - taille maximale de 5 Mo et 5 000 lignes ;
 - journal d’import détaillé.
 
+## 3 bis. Import des agents de scolarité
+
+Dans **Administration > Imports**, téléchargez le modèle CSV des agents, renseignez les identités et adresses
+professionnelles, puis utilisez **Prévisualiser**. Corrigez les erreurs avant de confirmer.
+Tous les nouveaux comptes sont créés avec le rôle `MANAGER`. Une adresse déjà enregistrée est ignorée,
+sans modification de droits. Aucun message n'est envoyé lors de la création ; utilisez ensuite
+le bouton d'activation des gestionnaires, par lots de 20. Les renvois individuels sont disponibles dans Administration.
+
+## 3 bis. Import des agents de scolarité
+
+Dans **Administration > Imports**, téléchargez le modèle CSV des agents, renseignez les identités et adresses
+professionnelles, puis utilisez **Prévisualiser**. Corrigez les erreurs avant de confirmer.
+Tous les nouveaux comptes sont créés avec le rôle `MANAGER`. Une adresse déjà enregistrée est ignorée,
+sans modification de droits. Aucun message n'est envoyé lors de la création ; utilisez ensuite
+le bouton d'activation des gestionnaires, par lots de 20. Les renvois individuels sont disponibles dans Administration.
+
 ## 4. Activation des comptes
 
 Les activations sont envoyées par lots de 20. Le lot standard exclut les comptes déjà contactés. Le renvoi individuel est disponible dans **Administration**.
