@@ -45,6 +45,24 @@ Valeurs horaires par défaut :
 
 Une date inexistante, un horaire invalide, une année incohérente ou un doublon dans le fichier sont rejetés ligne par ligne.
 
+## Agents de scolarité (PR 13)
+
+Import réservé aux administrateurs. CSV UTF-8 avec séparateur point-virgule ou virgule.
+Colonnes obligatoires : `prenom`, `nom`, `email`. Colonne facultative : `service`.
+La colonne facultative `role`, si présente, doit être `MANAGER` : les comptes créés prennent toujours le rôle `MANAGER`.
+Le modèle est disponible dans `/modeles/modele_agents_scolarite.csv`.
+Une prévisualisation est nécessaire avant validation. Les comptes existants ne sont jamais modifiés ni promus.
+Les courriels d'activation sont envoyés séparément après l'import.
+
+## Agents de scolarité (PR 13)
+
+Import réservé aux administrateurs. CSV UTF-8 avec séparateur point-virgule ou virgule.
+Colonnes obligatoires : `prenom`, `nom`, `email`. Colonne facultative : `service`.
+La colonne facultative `role`, si présente, doit être `MANAGER` : les comptes créés prennent toujours le rôle `MANAGER`.
+Le modèle est disponible dans `/modeles/modele_agents_scolarite.csv`.
+Une prévisualisation est nécessaire avant validation. Les comptes existants ne sont jamais modifiés ni promus.
+Les courriels d'activation sont envoyés séparément après l'import.
+
 ## CSV
 
 Le séparateur peut être la virgule ou le point-virgule. L’encodage recommandé est UTF-8.

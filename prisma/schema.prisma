@@ -81,6 +81,7 @@ enum AlertType {
 enum ImportKind {
   TEACHERS
   EXAMS
+  STAFF
 }
 
 enum ImportStatus {
