@@ -3,6 +3,7 @@ import { requireStaff } from "@/lib/guards";
 import { formatDateTime } from "@/lib/format";
 import { Notice } from "@/components/Notice";
 import { StatusBadge } from "@/components/StatusBadge";
+import { StaffImportForm } from "@/components/StaffImportForm";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +27,7 @@ export default async function ImportsPage({
   const { user } = await requireStaff();
   const isAdmin = user.role === "ADMIN";
   const params = await searchParams;
-  const [logs, pendingNeverSent, pendingAll] = await Promise.all([
+  const [logs, pendingNeverSent, pendingAll, staffNeverSent, staffPending] = await Promise.all([
     prisma.importLog.findMany({
       where: isAdmin ? {} : { kind: "EXAMS" },
       include: { createdBy: true },
@@ -38,7 +39,9 @@ export default async function ImportsPage({
       : Promise.resolve(0),
     isAdmin
       ? prisma.user.count({ where: { role: "TEACHER", isActive: true, mustChangePassword: true } })
-      : Promise.resolve(0)
+      : Promise.resolve(0),
+    isAdmin ? prisma.user.count({ where: { role: "MANAGER", isActive: true, mustChangePassword: true, activationSentAt: null } }) : Promise.resolve(0),
+    isAdmin ? prisma.user.count({ where: { role: "MANAGER", isActive: true, mustChangePassword: true } }) : Promise.resolve(0)
   ]);
 
   return (
@@ -106,6 +109,8 @@ export default async function ImportsPage({
         </div>
       </div>
 
+      {isAdmin && <StaffImportForm />}
+
       {isAdmin && (
         <div className="card">
           <div className="page-header">
@@ -127,6 +132,15 @@ export default async function ImportsPage({
         </div>
       )}
 
+      {isAdmin && <div className="card">
+        <h2>Activation des agents de scolarité</h2>
+        <p>{staffPending} gestionnaire(s) en attente d’activation ; {staffNeverSent} n’ont jamais reçu de lien.</p>
+        {staffNeverSent > 0 && <form action="/api/users/send-activations" method="post">
+          <input type="hidden" name="targetRole" value="MANAGER" />
+          <button>Envoyer les {Math.min(20, staffNeverSent)} prochains liens MANAGER</button>
+        </form>}
+        <p>Les renvois individuels sont disponibles dans Administration.</p>
+      </div>}
       <div className="card">
         <h2>Historique des imports</h2>
         <div className="table-wrap">
@@ -138,7 +152,7 @@ export default async function ImportsPage({
                 return (
                   <tr key={log.id}>
                     <td>{formatDateTime(log.createdAt)}</td>
-                    <td>{log.kind === "TEACHERS" ? "Enseignants" : "Examens"}</td>
+                    <td>{log.kind === "TEACHERS" ? "Enseignants" : log.kind === "STAFF" ? "Agents de scolarité" : "Examens"}</td>
                     <td>{log.fileName}</td>
                     <td>
                       {log.status === "SUCCESS"
