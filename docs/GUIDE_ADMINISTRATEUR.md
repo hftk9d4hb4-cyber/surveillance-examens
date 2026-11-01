@@ -101,3 +101,11 @@ Puis vérifier le déploiement de préproduction avant fusion sur `main`.
 ### Protection des données déjà notifiées
 
 La Release Candidate bloque les changements silencieux après l’envoi des convocations. Avant de désactiver un enseignant ou de modifier le statut d’un examen, réaffectez les surveillances futures et informez les personnes déjà convoquées. Le recalcul global d’une année est volontairement indisponible dès qu’une convocation de cette année a été envoyée.
+
+## Export des statistiques par service (PR 14)
+
+Dans **Statistiques annuelles**, sélectionnez l’année et le service, cliquez sur **Afficher**, puis sur **Exporter Excel**.
+L’onglet **Enseignants** reprend le service et le classement par quota affichés à l’écran.
+**Tous les services** conserve l’export global. **Service non renseigné** regroupe les libellés absents ou vides.
+Les onglets **Synthèse** et **Services** restent ceux de toute la faculté ; leur périmètre et le filtre des enseignants sont précisés dans la synthèse.
+Le nom du fichier contient l’année et, lorsqu’il est sélectionné, le service. Aucun quota ni aucune affectation n’est modifié.
