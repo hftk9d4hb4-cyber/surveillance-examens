@@ -44,7 +44,7 @@ export function buildAnnualStatistics(exams: AnnualExam[], teachers: AnnualTeach
   const teacherRows = [...byTeacher.values()].sort((a, b) => b.workloadPoints - a.workloadPoints || a.name.localeCompare(b.name, "fr"));
   const departmentMap = new Map<string, { department: string; teacherCount: number; assignmentCount: number; workloadPoints: number }>();
   for (const teacher of teacherRows) {
-    const department = teacher.department?.trim() || "Service non renseigné";
+    const department = teacherDepartmentLabel(teacher.department);
     const row = departmentMap.get(department) ?? { department, teacherCount: 0, assignmentCount: 0, workloadPoints: 0 };
     row.teacherCount += 1;
     row.assignmentCount += teacher.assignmentCount;
@@ -62,4 +62,25 @@ export function buildAnnualStatistics(exams: AnnualExam[], teachers: AnnualTeach
     teacherRows,
     departments
   };
+}
+
+export function teacherDepartmentLabel(department: string | null) {
+  return department?.trim() || "Service non renseigné";
+}
+
+// Shared by the screen and workbook so both use the same service and quota order.
+export function selectAnnualTeachers(stats: AnnualStatistics, requestedDepartment = "") {
+  const serviceOptions = [...new Set(stats.teacherRows.map(teacher => teacherDepartmentLabel(teacher.department)))].sort((a, b) => a.localeCompare(b, "fr"));
+  const selectedDepartment = serviceOptions.includes(requestedDepartment) ? requestedDepartment : "";
+  const teacherRows = stats.teacherRows
+    .filter(teacher => !selectedDepartment || teacherDepartmentLabel(teacher.department) === selectedDepartment)
+    .sort((a, b) => {
+      const aOver = a.quotaAnnual !== null && a.assignmentCount > a.quotaAnnual;
+      const bOver = b.quotaAnnual !== null && b.assignmentCount > b.quotaAnnual;
+      if (aOver !== bOver) return aOver ? -1 : 1;
+      const aRatio = a.quotaAnnual && a.quotaAnnual > 0 ? a.assignmentCount / a.quotaAnnual : -1;
+      const bRatio = b.quotaAnnual && b.quotaAnnual > 0 ? b.assignmentCount / b.quotaAnnual : -1;
+      return bRatio - aRatio || a.name.localeCompare(b.name, "fr");
+    });
+  return { serviceOptions, selectedDepartment, teacherRows };
 }

@@ -49,5 +49,5 @@ jobs:
       - run: npm test
       - run: npx prisma migrate deploy
       - run: npm run build
-      - name: Recette PR13 sur PostgreSQL isolé et SMTP local
+      - name: Recette imports et export statistique sur PostgreSQL isolé
         run: node scripts/validate-staff-import.mjs

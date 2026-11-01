@@ -3,7 +3,7 @@ import { requireStaff } from "@/lib/guards";
 import { prisma } from "@/lib/prisma";
 import { academicYearForDate } from "@/lib/format";
 import { todayInTimeZone } from "@/lib/time";
-import { buildAnnualStatistics } from "@/lib/annual-statistics";
+import { buildAnnualStatistics, selectAnnualTeachers, teacherDepartmentLabel } from "@/lib/annual-statistics";
 import { StatCard } from "@/components/StatCard";
 
 export const dynamic = "force-dynamic";
@@ -29,23 +29,14 @@ export default async function StatisticsPage({ searchParams }: {
     })
   ]);
   const stats = buildAnnualStatistics(exams, teachers);
-  const serviceOptions = [...new Set(stats.teacherRows.map((teacher) => teacher.department?.trim() || "Service non renseigné"))].sort((a, b) => a.localeCompare(b, "fr"));
   const requestedDepartment = typeof params.department === "string" ? params.department : "";
-  const selectedDepartment = serviceOptions.includes(requestedDepartment) ? requestedDepartment : "";
-  const visibleTeacherRows = stats.teacherRows
-    .filter((teacher) => !selectedDepartment || (teacher.department?.trim() || "Service non renseigné") === selectedDepartment)
-    .sort((a, b) => {
-      const aOver = a.quotaAnnual !== null && a.assignmentCount > a.quotaAnnual;
-      const bOver = b.quotaAnnual !== null && b.assignmentCount > b.quotaAnnual;
-      if (aOver !== bOver) return aOver ? -1 : 1;
-      const aRatio = a.quotaAnnual && a.quotaAnnual > 0 ? a.assignmentCount / a.quotaAnnual : -1;
-      const bRatio = b.quotaAnnual && b.quotaAnnual > 0 ? b.assignmentCount / b.quotaAnnual : -1;
-      return bRatio - aRatio || a.name.localeCompare(b.name, "fr");
-    });
+  const { serviceOptions, selectedDepartment, teacherRows: visibleTeacherRows } = selectAnnualTeachers(stats, requestedDepartment);
+  const exportParams = new URLSearchParams({ year: selectedYear });
+  if (selectedDepartment) exportParams.set("department", selectedDepartment);
   return <main className="container">
     <div className="page-header">
       <div><h1>Statistiques annuelles</h1><p className="muted">Année universitaire {selectedYear} · examens publiés et affectations enregistrées</p></div>
-      <div className="actions"><a className="button secondary" href={`/api/export/statistics?year=${encodeURIComponent(selectedYear)}`}>Exporter Excel</a><Link className="button secondary" href="/assignments">Affectations</Link></div>
+      <div className="actions"><a className="button secondary" href={`/api/export/statistics?${exportParams.toString()}`}>Exporter Excel</a><Link className="button secondary" href="/assignments">Affectations</Link></div>
     </div>
     <section className="card" aria-label="Choisir l’année universitaire">
       <form action="/statistics" className="inline-form">
@@ -61,6 +52,7 @@ export default async function StatisticsPage({ searchParams }: {
         <button type="submit">Afficher</button>
       </form>
     </section>
+    <p className="muted">Le filtre s’applique au tableau des enseignants et à son export Excel. La synthèse et la répartition par service restent celles de toute la faculté.</p>
     <div className="grid">
       <div className="col-3"><StatCard value={stats.examCount} label="examens publiés" /></div>
       <div className="col-3"><StatCard value={`${stats.assignedPosts} / ${stats.requiredPosts}`} label="postes pourvus" /></div>
@@ -88,7 +80,7 @@ export default async function StatisticsPage({ searchParams }: {
           const quotaPercent = progressMax === null ? null : Math.round((teacher.assignmentCount / progressMax) * 100);
           return <tr key={teacher.id}>
             <th scope="row">{teacher.name}</th>
-            <td>{teacher.department || "Service non renseigné"}</td>
+            <td>{teacherDepartmentLabel(teacher.department)}</td>
             <td>{teacher.assignmentCount}</td>
             <td>{teacher.workloadPoints.toFixed(1)}</td>
             <td>{teacher.quotaAnnual ?? "Non défini"}</td>

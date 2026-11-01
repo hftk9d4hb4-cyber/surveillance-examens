@@ -4,6 +4,7 @@ import { createServer } from "node:net";
 import { setTimeout as delay } from "node:timers/promises";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { validateStatisticsExport } from "./validate-statistics-export.mjs";
 
 // Refuse to run against any real database or externally hosted application.
 for (const key of ["DATABASE_URL", "DATABASE_URL_UNPOOLED"]) {
@@ -159,6 +160,7 @@ try {
   const page = await (await request("/admin/imports", {}, managerJar)).text();
   assert.doesNotMatch(page, /<h2>Import CSV des agents de scolarité<\/h2>/);
   assert.match(await (await request(path, {}, new Map())).text(), /Ce lien est invalide ou expiré/);
+  await validateStatisticsExport({ prisma, request, teacherJar, managerJar });
   console.log("PR13 integration passed: migrations, permissions, preview, import, duplicates, account protection, audit, local mail, activation and MANAGER login.");
 } finally {
   if (server) server.kill("SIGTERM");
