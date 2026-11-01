@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 
 type Preview = {
   total: number; toCreate: number; existing: number; errors: number;
@@ -11,6 +12,7 @@ type Preview = {
 };
 
 export function StaffImportForm() {
+  const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [busy, setBusy] = useState(false);
@@ -30,7 +32,7 @@ export function StaffImportForm() {
       const json = await result.json();
       if (!result.ok) throw new Error(json.error || "Erreur de traitement.");
       if (action === "preview") { setPreview(json); setCompleted(false); }
-      else { setCompleted(true); setPreview(null); setMessage(`${json.created} compte(s) MANAGER créé(s), ${json.alreadyExisting} compte(s) déjà existant(s). Aucun courriel envoyé.`); }
+      else { setCompleted(true); setPreview(null); setMessage(`${json.created} compte(s) MANAGER créé(s), ${json.alreadyExisting} compte(s) déjà existant(s). Aucun courriel envoyé.`); router.refresh(); }
     } catch (e) { setMessage(e instanceof Error ? e.message : "Erreur inconnue."); }
     finally { setBusy(false); }
   }
