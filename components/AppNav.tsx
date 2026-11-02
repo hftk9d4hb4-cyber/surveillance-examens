@@ -17,6 +17,8 @@ export async function AppNav() {
         </Link>
         <nav className="nav-links" aria-label="Navigation principale">
           <Link href="/dashboard">Tableau de bord</Link>
+          {hasStaffRole(role) && <Link href="/preparation">Préparation</Link>}
+          {hasStaffRole(role) && <Link href="/guide">Guide</Link>}
           {hasStaffRole(role) && <Link href="/planning">Planning</Link>}
           {hasStaffRole(role) && <Link href="/statistics">Statistiques</Link>}
           <Link href="/availability">Disponibilités</Link>

@@ -1,4 +1,5 @@
 import ExcelJS from "exceljs";
+import { buildEquityReport } from "./equity-report";
 import { selectAnnualTeachers, teacherDepartmentLabel, type AnnualStatistics } from "./annual-statistics";
 
 export function buildAnnualStatisticsWorkbook(stats: AnnualStatistics, requestedYear: string, department = "") {
@@ -9,7 +10,7 @@ export function buildAnnualStatisticsWorkbook(stats: AnnualStatistics, requested
   summary.addRows([
     ["Année universitaire", requestedYear],
     ["Service sélectionné — enseignants", selectedDepartment || "Tous les services"],
-    ["Périmètre — Synthèse et Services", "Faculté entière"],
+    ["Périmètre — Synthèse, Services et Équité", "Faculté entière"],
     ["Périmètre — Enseignants", selectedDepartment || "Tous les services"],
     ["Examens publiés", stats.examCount],
     ["Postes requis", stats.requiredPosts],
@@ -54,6 +55,26 @@ export function buildAnnualStatisticsWorkbook(stats: AnnualStatistics, requested
     worksheet.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF102A43" } };
     worksheet.autoFilter = { from: "A1", to: worksheet.getRow(1).getCell(worksheet.columnCount).address };
   }
+  const equity = workbook.addWorksheet("Équité");
+  equity.columns = [
+    { header: "Service — faculté entière", key: "department", width: 34 },
+    { header: "Enseignants", key: "teacherCount", width: 18 },
+    { header: "Affectations", key: "assignmentCount", width: 18 },
+    { header: "Points pondérés", key: "workloadPoints", width: 20 },
+    { header: "Moyenne points", key: "averagePoints", width: 20 },
+    { header: "Points minimum", key: "minPoints", width: 18 },
+    { header: "Points maximum", key: "maxPoints", width: 18 },
+    { header: "Quota dépassé", key: "overQuota", width: 18 },
+    { header: "Quota atteint", key: "atQuota", width: 18 },
+    { header: "Quota non atteint", key: "underQuota", width: 20 },
+    { header: "Quota non défini", key: "quotaMissing", width: 20 },
+    { header: "Quota nul", key: "zeroQuota", width: 18 },
+    { header: "Utilisation quotas positifs (%)", key: "quotaUsePercent", width: 30 }
+  ];
+  buildEquityReport(stats).forEach(row => equity.addRow({ ...row, averagePoints: Number(row.averagePoints.toFixed(1)), quotaUsePercent: row.quotaUsePercent ?? "Non calculable" }));
+  equity.views = [{ state: "frozen", ySplit: 1 }];
+  equity.getRow(1).font = { bold: true };
+  equity.autoFilter = { from: "A1", to: "M1" };
   return workbook;
 }
 

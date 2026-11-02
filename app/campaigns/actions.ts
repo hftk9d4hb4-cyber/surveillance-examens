@@ -3,6 +3,8 @@
 import { Prisma, type CampaignStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { canAccessCampaign } from "@/lib/campaign-access";
+import { loadPreparationReport } from "@/lib/preparation";
 import { writeAudit } from "@/lib/audit";
 import { CAMPAIGN_STATUSES, canTransitionCampaign } from "@/lib/campaigns";
 import { requireStaff } from "@/lib/guards";
@@ -82,6 +84,7 @@ export async function updateCampaign(formData: FormData) {
     include: { exams: { select: { date: true } } }
   });
   if (!campaign) redirect("/campaigns?error=not-found");
+  if (!canAccessCampaign(campaign.managerId, actor)) redirect("/campaigns?error=access");
   if (campaign.status === "CLOSED") redirect("/campaigns?error=closed");
   if (campaign.exams.some((exam: { date: Date }) => exam.date < data.startDate || exam.date > data.endDate)) {
     redirect("/campaigns?error=exam-period");
@@ -111,11 +114,18 @@ export async function updateCampaignStatus(formData: FormData) {
     include: { _count: { select: { exams: true } } }
   });
   if (!campaign) redirect("/campaigns?error=not-found");
+  if (!canAccessCampaign(campaign.managerId, actor)) redirect("/campaigns?error=access");
   if (!canTransitionCampaign(campaign.status, status)) redirect("/campaigns?error=transition");
   if (["COLLECTING", "ASSIGNING", "PUBLISHED"].includes(status) && campaign._count.exams === 0) {
     redirect("/campaigns?error=empty");
   }
 
+  let publicationReview: { blockers: number; warnings: number } | null = null;
+  if (status === "PUBLISHED" && campaign.status !== "PUBLISHED") {
+    const report = await loadPreparationReport({ academicYear: campaign.academicYear, campaignId: id });
+    if (!report.ready || formData.get("reviewConfirmed") !== "true") redirect(`/campaigns/${id}/review`);
+    publicationReview = { blockers: report.blockers.length, warnings: report.warnings.length };
+  }
   await prisma.campaign.update({
     where: { id },
     data: {
@@ -128,7 +138,7 @@ export async function updateCampaignStatus(formData: FormData) {
     action: "CAMPAIGN_STATUS_UPDATED",
     entity: "Campaign",
     entityId: id,
-    details: { from: campaign.status, to: status }
+    details: { from: campaign.status, to: status, reviewConfirmed: formData.get("reviewConfirmed") === "true", publicationReview }
   });
   refresh();
 }
@@ -142,6 +152,7 @@ export async function deleteCampaign(formData: FormData) {
     include: { _count: { select: { exams: true } } }
   });
   if (!campaign) return;
+  if (!canAccessCampaign(campaign.managerId, actor)) redirect("/campaigns?error=access");
   if (campaign._count.exams > 0) redirect("/campaigns?error=has-exams");
   if (campaign.status !== "PREPARATION" && campaign.status !== "CLOSED") {
     redirect("/campaigns?error=delete-status");

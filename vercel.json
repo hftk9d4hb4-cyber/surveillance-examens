@@ -1,4 +1,9 @@
 {
   "buildCommand": "npm run vercel-build",
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "git": {
+    "deploymentEnabled": {
+      "feature/pr15-pilotage-scolarite": false
+    }
+  }
 }

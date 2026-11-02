@@ -4,6 +4,7 @@ import { createServer } from "node:net";
 import { setTimeout as delay } from "node:timers/promises";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { validatePilotage } from "./validate-pilotage.mjs";
 import { validateStatisticsExport } from "./validate-statistics-export.mjs";
 
 // Refuse to run against any real database or externally hosted application.
@@ -17,6 +18,7 @@ const base = "http://localhost:3000";
 const prisma = new PrismaClient();
 const password = "LocalFixture2026!";
 const mails = [];
+const smtpControl = { fail: false };
 const sockets = new Set();
 const smtp = createServer(socket => {
   sockets.add(socket);
@@ -40,6 +42,7 @@ const smtp = createServer(socket => {
       } else if (/^EHLO/i.test(line)) socket.write("250-localhost\r\n250 AUTH PLAIN\r\n");
       else if (/^DATA$/i.test(line)) { message = ""; socket.write("354 send message\r\n"); }
       else if (/^QUIT$/i.test(line)) socket.end("221 bye\r\n");
+      else if (/^RCPT /i.test(line) && smtpControl.fail) socket.write("550 Fixture rejects delivery\r\n");
       else if (/^AUTH /i.test(line)) socket.write("235 authenticated\r\n");
       else socket.write("250 OK\r\n");
     }
@@ -161,6 +164,7 @@ try {
   assert.doesNotMatch(page, /<h2>Import CSV des agents de scolarité<\/h2>/);
   assert.match(await (await request(path, {}, new Map())).text(), /Ce lien est invalide ou expiré/);
   await validateStatisticsExport({ prisma, request, teacherJar, managerJar });
+  await validatePilotage({ prisma, request, teacherJar, managerJar, mails, smtpControl });
   console.log("PR13 integration passed: migrations, permissions, preview, import, duplicates, account protection, audit, local mail, activation and MANAGER login.");
 } finally {
   if (server) server.kill("SIGTERM");

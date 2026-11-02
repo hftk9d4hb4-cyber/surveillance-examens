@@ -122,6 +122,8 @@ export default async function DashboardPage({
           <p className="muted">Pilotage opérationnel des surveillances d’examens.</p>
         </div>
         <div className="actions">
+          <Link className="button" href="/preparation">Préparation des examens</Link>
+          <Link className="button secondary" href="/guide">Guide scolarité</Link>
           <Link className="button" href="/planning">Voir le planning mensuel</Link>
           <Link className="button secondary" href="/admin/imports">Importer les données</Link>
           <Link className="button secondary" href="/assignments">Gérer les affectations</Link>

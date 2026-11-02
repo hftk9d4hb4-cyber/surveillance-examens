@@ -1,0 +1,14 @@
+import Link from "next/link";
+import { requireStaff } from "@/lib/guards";
+const steps = [
+  { title: "1. Préparer les comptes et la campagne", text: "Vérifiez les identités et services des enseignants, puis créez la campagne avec son année, sa promotion, sa période et sa gestionnaire. L’administrateur contrôle les liens d’activation et les échecs d’envoi.", href: "/campaigns", label: "Campagnes" },
+  { title: "2. Importer et rattacher les examens", text: "Utilisez le modèle d’import. Vérifiez dates, horaires, lieux et nombre de surveillants, puis rattachez les examens à la bonne campagne. Écartez les examens annulés.", href: "/admin/imports", label: "Imports" },
+  { title: "3. Recueillir les disponibilités", text: "Passez la campagne en collecte. Depuis son suivi des relances, ciblez les comptes à activer ou les réponses incomplètes. Les relances respectent un intervalle de sept jours après un envoi réussi.", href: "/preparation", label: "Préparation et relances" },
+  { title: "4. Simuler et arbitrer les affectations", text: "Vérifiez les quotas, simulez, consultez les explications puis validez la simulation. Une affectation manuelle doit être vérifiée au même titre qu’une proposition automatique. Le verrouillage conserve un choix lors du prochain calcul.", href: "/assignments", label: "Affectations" },
+  { title: "5. Contrôler, publier et convoquer", text: "Ouvrez le contrôle avant publication de la campagne. Corrigez les points bloquants et examinez les avertissements. Publier la campagne n’envoie aucun courriel : déclenchez ensuite les convocations, suivez les échecs et les confirmations. Après envoi, utilisez le parcours de modification avec notification.", href: "/convocations", label: "Convocations" },
+  { title: "6. Faire le bilan annuel", text: "Comparez les charges, les quotas et les services. Dans Statistiques, choisissez l’année et le service puis cliquez sur Afficher avant d’exporter. Seul l’onglet Enseignants est filtré ; Synthèse, Services et Équité gardent le périmètre de la faculté.", href: "/statistics", label: "Statistiques et équité" }
+];
+export default async function GuidePage() {
+  const { user } = await requireStaff();
+  return <main className="container"><div className="page-header"><div><h1>Guide scolarité</h1><p>Un parcours en six étapes, de la préparation au bilan annuel.</p></div><Link className="button secondary" href="/preparation">Reprendre la préparation</Link></div>{steps.map(step => <section className="card" key={step.title}><h2>{step.title}</h2><p>{step.text}</p><Link className="button secondary" href={step.href}>{step.label}</Link></section>)}{user.role === "ADMIN" && <section className="card"><h2>Administration des comptes</h2><Link href="/admin/activations">Liens expirés, comptes à activer et échecs d’envoi</Link></section>}</main>;
+}
