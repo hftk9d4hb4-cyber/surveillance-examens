@@ -77,6 +77,7 @@ export async function sendCampaignReminders(formData: FormData) {
         const { token } = await createActivationToken(user.id);
         await sendActivationMail(user, token);
         await prisma.user.update({ where: { id: user.id }, data: { activationSentAt: new Date() } });
+        await writeAudit({ actorId: actor.id, action: "ACCOUNT_ACTIVATION_SENT", entity: "User", entityId: user.id, details: { campaignId } });
       } else {
         await sendAvailabilityReminderMail(user, dashboard.campaign);
       }
@@ -129,6 +130,7 @@ export async function sendCampaignReminders(formData: FormData) {
         }
       }
     } catch (error) {
+      if (kind === "ACTIVATION") await writeAudit({ actorId: actor.id, action: "ACCOUNT_ACTIVATION_FAILED", entity: "User", entityId: user.id, details: { campaignId } });
       await writeAudit({
         actorId: actor.id,
         action: "CAMPAIGN_REMINDER_FAILED",

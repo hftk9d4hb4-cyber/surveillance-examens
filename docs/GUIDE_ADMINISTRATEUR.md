@@ -109,3 +109,14 @@ L’onglet **Enseignants** reprend le service et le classement par quota affich�
 **Tous les services** conserve l’export global. **Service non renseigné** regroupe les libellés absents ou vides.
 Les onglets **Synthèse** et **Services** restent ceux de toute la faculté ; leur périmètre et le filtre des enseignants sont précisés dans la synthèse.
 Le nom du fichier contient l’année et, lorsqu’il est sélectionné, le service. Aucun quota ni aucune affectation n’est modifié.
+
+## PR 15 — Préparation, contrôle et accompagnement
+
+- **Préparation** regroupe les campagnes ouvertes accessibles au gestionnaire, avec postes vacants, disponibilités incomplètes, convocations à envoyer, erreurs et confirmations attendues. Les administrateurs voient toutes les campagnes. Le périmètre des disponibilités reste l’ensemble des enseignants actifs, sur les créneaux des examens publiés de la campagne.
+- **Contrôle avant publication** recalcule le bilan à l’ouverture et lors de la soumission. Postes vacants, conflits de demi-journée (y compris hors campagne), dépassement de la limite quotidienne, indisponibilités et comptes non éligibles sont bloquants. Quotas dépassés, comptes à activer et réponses absentes restent des avertissements. La publication exige une confirmation de lecture ; elle ne déclenche aucun courriel. Les envois de convocations repassent le contrôle au début de chaque lot. Une modification concurrente pendant un lot doit toujours être traitée dans le parcours de modification après envoi.
+- **Administration > Suivi des activations** distingue invitations à envoyer, liens valides ou expirés, comptes inactifs/activés et échecs du dernier envoi. Chaque renvoi est ciblé et renouvelle le lien. Les résultats individuels ne sont disponibles qu’à partir de cette version ; un SMTP acceptant un message ne garantit pas sa réception.
+- **Affectations** propose « Comprendre cette affectation » sur les simulations et affectations enregistrées. Seules les valeurs mémorisées sont expliquées ; les affectations manuelles et anciennes sans détail sont explicitement identifiées.
+- **Statistiques** présente un bilan annuel d’équité descriptif par service (points moyens, étendue, quotas atteints/dépassés/non atteints/manquants). L’onglet Excel **Équité** reste global, comme Synthèse et Services. Le pourcentage d’utilisation des quotas utilise uniquement les quotas strictement positifs et les affectations des mêmes enseignants, sans mélange avec les points pondérés.
+- **Guide** accompagne la scolarité en six étapes et renvoie aux écrans d’action.
+
+Aucune nouvelle migration. Les parcours Préparation, Guide, Contrôle et Activations vérifient les droits côté serveur. Les actions de publication et envoi refusent les campagnes attribuées à un autre gestionnaire.

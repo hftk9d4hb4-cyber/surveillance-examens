@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { EquityReport } from "@/components/EquityReport";
 import { requireStaff } from "@/lib/guards";
 import { prisma } from "@/lib/prisma";
 import { academicYearForDate } from "@/lib/format";
@@ -94,5 +95,6 @@ export default async function StatisticsPage({ searchParams }: {
         {!visibleTeacherRows.length && <tr><td colSpan={7} className="empty">Aucun enseignant actif pour ce service.</td></tr>}
       </tbody></table></div>
     </section>
+    <EquityReport stats={stats} />
   </main>;
 }

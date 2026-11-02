@@ -8,6 +8,8 @@ import { getActiveApiUser } from "@/lib/guards";
 export async function POST(request: Request) {
   const actor = await getActiveApiUser();
   if (!actor || actor.role !== "ADMIN") return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+  const origin = request.headers.get("origin");
+  if (origin && origin !== new URL(request.url).origin) return NextResponse.json({ error: "Origine non autorisée" }, { status: 403 });
   const formData = await request.formData();
   const specificUserId = String(formData.get("userId") || "");
   const resend = formData.get("resend") === "true";
@@ -33,8 +35,10 @@ export async function POST(request: Request) {
       const { token } = await createActivationToken(user.id);
       await sendActivationMail(user, token);
       await prisma.user.update({ where: { id: user.id }, data: { activationSentAt: new Date() } });
+      await writeAudit({ actorId: actor.id, action: "ACCOUNT_ACTIVATION_SENT", entity: "User", entityId: user.id, details: { targetRole } });
       sent += 1;
     } catch {
+      await writeAudit({ actorId: actor.id, action: "ACCOUNT_ACTIVATION_FAILED", entity: "User", entityId: user.id, details: { targetRole } });
       failed += 1;
     }
   }
@@ -44,5 +48,6 @@ export async function POST(request: Request) {
     entity: "User",
     details: { sent, failed, targetRole, specificUserId: specificUserId || null }
   });
-  return NextResponse.redirect(new URL(`/admin/imports?activationSent=${sent}&activationFailed=${failed}`, request.url), 303);
+  const destination = formData.get("returnTo") === "activations" ? `/admin/activations?role=${targetRole}&sent=${sent}&failed=${failed}` : `/admin/imports?activationSent=${sent}&activationFailed=${failed}`;
+  return NextResponse.redirect(new URL(destination, request.url), 303);
 }

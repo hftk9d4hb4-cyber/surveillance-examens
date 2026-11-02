@@ -49,5 +49,5 @@ jobs:
       - run: npm test
       - run: npx prisma migrate deploy
       - run: npm run build
-      - name: Recette imports et export statistique sur PostgreSQL isolé
+      - name: Recette complète scolarité sur PostgreSQL isolé et SMTP local
         run: node scripts/validate-staff-import.mjs

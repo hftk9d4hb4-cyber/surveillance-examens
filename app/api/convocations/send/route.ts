@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { canAccessCampaign } from "@/lib/campaign-access";
+import { loadPreparationReport } from "@/lib/preparation";
 import { prisma } from "@/lib/prisma";
 import { sendConvocationMail } from "@/lib/mail";
 import { writeAudit } from "@/lib/audit";
@@ -15,6 +17,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
   }
 
+  const origin = request.headers.get("origin");
+  if (origin && origin !== new URL(request.url).origin) return NextResponse.json({ error: "Origine non autorisée" }, { status: 403 });
   const formData = await request.formData();
   const examId = String(formData.get("examId") || "");
   const requestedYear = String(formData.get("academicYear") || "");
@@ -25,7 +29,7 @@ export async function POST(request: Request) {
   if (examId) {
     const exam = await prisma.exam.findUnique({
       where: { id: examId },
-      select: { academicYear: true, status: true, date: true }
+      select: { academicYear: true, status: true, date: true, campaign: { select: { managerId: true } } }
     });
     if (!exam || exam.status !== "PUBLISHED" || exam.date < today) {
       return NextResponse.redirect(
@@ -33,6 +37,7 @@ export async function POST(request: Request) {
         303
       );
     }
+    if (exam.campaign && !canAccessCampaign(exam.campaign.managerId, actor)) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
     effectiveYear = exam.academicYear;
   } else if (!isValidAcademicYear(effectiveYear)) {
     return NextResponse.redirect(new URL("/convocations?error=year", request.url), 303);
@@ -45,9 +50,13 @@ export async function POST(request: Request) {
     );
   }
 
+  const report = await loadPreparationReport({ academicYear: effectiveYear, ...(examId ? { examId } : {}), futureOnly: true, ...(actor.role === "MANAGER" ? { managerId: actor.id } : {}) });
+  if (!report.ready) return NextResponse.redirect(new URL(`/convocations?year=${encodeURIComponent(effectiveYear)}&error=preflight`, request.url), 303);
+
   const where = {
     ...(examId ? { examId } : {}),
     exam: {
+      ...(actor.role === "MANAGER" ? { OR: [{ campaignId: null }, { campaign: { managerId: null } }, { campaign: { managerId: actor.id } }] } : {}),
       academicYear: effectiveYear,
       status: "PUBLISHED" as const,
       date: { gte: today }
